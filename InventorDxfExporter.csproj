@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>InventorDxfExporter</AssemblyName>
+    <RootNamespace>InventorDxfExporter</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <InventorBinPath Condition="'$(InventorBinPath)' == ''">C:\Program Files\Autodesk\Inventor 2027\Bin</InventorBinPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Preview\**\*.cs" />
+    <Compile Remove="Skill\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <Reference Include="Autodesk.Inventor.Interop">
+      <HintPath>$(InventorBinPath)\Autodesk.Inventor.Interop.dll</HintPath>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+      <Private>false</Private>
+    </Reference>
+    <None Update="InventorDxfExporter.addin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

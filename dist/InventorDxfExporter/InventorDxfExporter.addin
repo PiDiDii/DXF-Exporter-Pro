@@ -1,0 +1,13 @@
+<Addin Type="Standard">
+  <ClassId>{6B93E5C1-9A6A-4D1B-8FA9-47567B4A1D20}</ClassId>
+  <ClientId>{6B93E5C1-9A6A-4D1B-8FA9-47567B4A1D20}</ClientId>
+  <DisplayName>DXF Exporter Pro</DisplayName>
+  <Description>Xuất DXF, BOM và chuyển đổi STEP cho Inventor 2027.</Description>
+  <Assembly>InventorDxfExporter.dll</Assembly>
+  <OSType>Win64</OSType>
+  <LoadAutomatically>0</LoadAutomatically>
+  <UserUnloadable>1</UserUnloadable>
+  <Hidden>0</Hidden>
+  <LoadBehavior>10</LoadBehavior>
+  <UserInterfaceVersion>1</UserInterfaceVersion>
+</Addin>

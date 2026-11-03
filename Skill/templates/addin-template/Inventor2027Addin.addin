@@ -1,0 +1,13 @@
+<Addin Type="Standard">
+  <ClassId>{91949afe-d3ca-457f-bcf9-752b61f14af4}</ClassId>
+  <ClientId>{91949afe-d3ca-457f-bcf9-752b61f14af4}</ClientId>
+  <DisplayName>Inventor 2027 Add-in Template</DisplayName>
+  <Description>Minimal registry-free Inventor 2027 add-in starter.</Description>
+  <Assembly>Inventor2027Addin.dll</Assembly>
+  <OSType>Win64</OSType>
+  <LoadAutomatically>0</LoadAutomatically>
+  <UserUnloadable>1</UserUnloadable>
+  <Hidden>0</Hidden>
+  <LoadBehavior>10</LoadBehavior>
+  <UserInterfaceVersion>1</UserInterfaceVersion>
+</Addin>
