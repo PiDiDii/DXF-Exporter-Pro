@@ -19,3 +19,25 @@ E:\DxfExporterPro_Source\bin\Release\net10.0-windows\ExcelNumberFormat.dll
 E:\DxfExporterPro_Source\bin\Release\net10.0-windows\RBush.dll
 E:\DxfExporterPro_Source\bin\Release\net10.0-windows\SixLabors.Fonts.dll
 E:\DxfExporterPro_Source\obj\Release\net10.0-windows\Inventor.40611337.Up2Date
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\InventorDxfExporter.addin
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\InventorDxfExporter.deps.json
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\InventorDxfExporter.dll
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\InventorDxfExporter.pdb
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\ClosedXML.dll
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\ClosedXML.Parser.dll
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\DocumentFormat.OpenXml.dll
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\DocumentFormat.OpenXml.Framework.dll
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\ExcelNumberFormat.dll
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\RBush.dll
+E:\DXF Exporter Pro\bin\Release\net10.0-windows\SixLabors.Fonts.dll
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\InventorDxfExporter.csproj.AssemblyReference.cache
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\InventorDxfExporter.GeneratedMSBuildEditorConfig.editorconfig
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\InventorDxfExporter.AssemblyInfoInputs.cache
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\InventorDxfExporter.AssemblyInfo.cs
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\InventorDxfExporter.csproj.CoreCompileInputs.cache
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\InventorDxfExporter.sourcelink.json
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\Inventor.40611337.Up2Date
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\InventorDxfExporter.dll
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\refint\InventorDxfExporter.dll
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\InventorDxfExporter.pdb
+E:\DXF Exporter Pro\obj\Release\net10.0-windows\ref\InventorDxfExporter.dll

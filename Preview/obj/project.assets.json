@@ -275,11 +275,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "e:\\DxfExporterPro_Source\\Preview\\ExportSettingsPreview.csproj",
+      "projectUniqueName": "E:\\DXF Exporter Pro\\Preview\\ExportSettingsPreview.csproj",
       "projectName": "ExportSettingsPreview",
-      "projectPath": "e:\\DxfExporterPro_Source\\Preview\\ExportSettingsPreview.csproj",
+      "projectPath": "E:\\DXF Exporter Pro\\Preview\\ExportSettingsPreview.csproj",
       "packagesPath": "C:\\Users\\ptqn9\\.nuget\\packages\\",
-      "outputPath": "e:\\DxfExporterPro_Source\\Preview\\obj\\",
+      "outputPath": "E:\\DXF Exporter Pro\\Preview\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\ptqn9\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -297,8 +297,8 @@
           "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
           "projectReferences": {
-            "E:\\DxfExporterPro_Source\\InventorDxfExporter.csproj": {
-              "projectPath": "E:\\DxfExporterPro_Source\\InventorDxfExporter.csproj"
+            "E:\\DXF Exporter Pro\\InventorDxfExporter.csproj": {
+              "projectPath": "E:\\DXF Exporter Pro\\InventorDxfExporter.csproj"
             }
           }
         }

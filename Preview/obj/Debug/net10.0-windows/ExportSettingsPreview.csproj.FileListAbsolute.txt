@@ -24,3 +24,30 @@ E:\DxfExporterPro_Source\Preview\obj\Debug\net10.0-windows\refint\ExportSettings
 E:\DxfExporterPro_Source\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.pdb
 E:\DxfExporterPro_Source\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.genruntimeconfig.cache
 E:\DxfExporterPro_Source\Preview\obj\Debug\net10.0-windows\ref\ExportSettingsPreview.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\InventorDxfExporter.addin
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\ExportSettingsPreview.exe
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\ExportSettingsPreview.deps.json
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\ExportSettingsPreview.runtimeconfig.json
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\ExportSettingsPreview.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\ExportSettingsPreview.pdb
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\ClosedXML.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\ClosedXML.Parser.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\DocumentFormat.OpenXml.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\DocumentFormat.OpenXml.Framework.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\ExcelNumberFormat.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\RBush.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\SixLabors.Fonts.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\InventorDxfExporter.dll
+E:\DXF Exporter Pro\Preview\bin\Debug\net10.0-windows\InventorDxfExporter.pdb
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.csproj.AssemblyReference.cache
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.GeneratedMSBuildEditorConfig.editorconfig
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.AssemblyInfoInputs.cache
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.AssemblyInfo.cs
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.csproj.CoreCompileInputs.cache
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.sourcelink.json
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSe.F9E19BEC.Up2Date
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.dll
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\refint\ExportSettingsPreview.dll
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.pdb
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.genruntimeconfig.cache
+E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ref\ExportSettingsPreview.dll

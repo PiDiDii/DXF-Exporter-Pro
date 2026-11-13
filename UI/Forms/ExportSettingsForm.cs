@@ -1,7 +1,10 @@
 using InventorDxfExporter.Core;
 using InventorDxfExporter.Settings;
+using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Windows.Forms;
+using System.Windows.Forms.VisualStyles;
 
 namespace InventorDxfExporter.UI.Forms;
 
@@ -18,15 +21,26 @@ public sealed class ExportSettingsForm : Form
     };
     private static readonly LayerColorOption[] LayerColors =
     {
-        new("Mặc định", ""),
-        new("Đen", "0;0;0"),
-        new("Đỏ", "255;0;0"),
-        new("Vàng", "255;255;0"),
-        new("Xanh lá", "0;255;0"),
-        new("Cyan", "0;255;255"),
-        new("Xanh dương", "0;0;255"),
-        new("Tím", "255;0;255"),
-        new("Trắng", "255;255;255")
+        new("Đen", Color.FromArgb(0, 0, 0)), new("Xám đậm", Color.FromArgb(64, 64, 64)),
+        new("Đỏ sẫm", Color.FromArgb(128, 0, 0)), new("Đỏ", Color.FromArgb(255, 0, 0)),
+        new("Cam", Color.FromArgb(255, 128, 0)), new("Vàng", Color.FromArgb(255, 255, 0)),
+        new("Vàng chanh", Color.FromArgb(192, 255, 0)), new("Xanh lá", Color.FromArgb(0, 192, 0)),
+        new("Xanh lá đậm", Color.FromArgb(0, 96, 0)), new("Xanh ngọc", Color.FromArgb(0, 128, 128)),
+        new("Cyan", Color.FromArgb(0, 255, 255)), new("Xanh da trời", Color.FromArgb(0, 160, 255)),
+        new("Xanh dương", Color.FromArgb(0, 0, 255)), new("Xanh navy", Color.FromArgb(0, 0, 128)),
+        new("Tím", Color.FromArgb(128, 0, 128)), new("Hồng tím", Color.FromArgb(255, 0, 255)),
+        new("Hồng", Color.FromArgb(255, 128, 192)), new("Trắng", Color.FromArgb(255, 255, 255)),
+        new("Xám sáng", Color.FromArgb(192, 192, 192)), new("Xám", Color.FromArgb(128, 128, 128)),
+        new("Nâu", Color.FromArgb(128, 64, 0)), new("Đỏ gạch", Color.FromArgb(192, 64, 64)),
+        new("Cam nhạt", Color.FromArgb(255, 192, 128)), new("Vàng nhạt", Color.FromArgb(255, 255, 160)),
+        new("Xanh non", Color.FromArgb(128, 255, 128)), new("Xanh bạc hà", Color.FromArgb(128, 255, 192)),
+        new("Xanh biển nhạt", Color.FromArgb(128, 224, 255)), new("Xanh lam nhạt", Color.FromArgb(128, 160, 255)),
+        new("Tím nhạt", Color.FromArgb(192, 128, 255)), new("Hồng nhạt", Color.FromArgb(255, 192, 224)),
+        new("Nâu nhạt", Color.FromArgb(192, 160, 128)), new("Xám xanh", Color.FromArgb(128, 160, 160)),
+        new("Xám tím", Color.FromArgb(160, 128, 160)), new("Xám olive", Color.FromArgb(160, 160, 96)),
+        new("Xanh rêu", Color.FromArgb(96, 128, 64)), new("Xanh cổ vịt", Color.FromArgb(0, 96, 96)),
+        new("Đỏ rượu", Color.FromArgb(128, 0, 64)), new("Tím than", Color.FromArgb(64, 0, 96)),
+        new("Xanh đen", Color.FromArgb(0, 64, 128)), new("Xám bạc", Color.FromArgb(224, 224, 224))
     };
     private static readonly LayerLineTypeOption[] LayerLineTypes =
     {
@@ -40,9 +54,8 @@ public sealed class ExportSettingsForm : Form
     };
     private static readonly LayerLineWeightOption[] LayerLineWeights =
     {
-        new("0,13 mm", 0.13), new("0,18 mm", 0.18), new("0,25 mm", 0.25),
-        new("0,35 mm", 0.35), new("0,50 mm", 0.50), new("0,70 mm", 0.70),
-        new("1,00 mm", 1.00), new("1,40 mm", 1.40), new("2,00 mm", 2.00)
+        new("0,18 mm", 0.18), new("0,25 mm", 0.25),
+        new("0,35 mm", 0.35), new("0,50 mm", 0.50), new("1,00 mm", 1.00)
     };
     private readonly ExportSettings _settings;
     private readonly SettingsProfileStore _profiles = new();
@@ -65,20 +78,18 @@ public sealed class ExportSettingsForm : Form
         Text = previewMode ? "Xem trước cài đặt xuất DXF" : "Cài đặt xuất DXF";
         StartPosition = previewMode ? FormStartPosition.CenterScreen : FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
-        MinimizeBox = false; MaximizeBox = false; ClientSize = new System.Drawing.Size(1200, 830);
+        MinimizeBox = false; MaximizeBox = false; ClientSize = new System.Drawing.Size(1000, 590);
         _layers.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Enabled", HeaderText = "Xuất", FillWeight = 35 });
         _layers.Columns.Add("Name", "Tên layer");
         _layers.Columns.Add("Description", "Mô tả");
-        _layers.Columns.Add(new DataGridViewComboBoxColumn
+        _layers.Columns.Add(new DataGridViewButtonColumn
         {
             Name = "Color",
             HeaderText = "Màu",
-            DataSource = LayerColors,
-            DisplayMember = nameof(LayerColorOption.Name),
-            ValueMember = nameof(LayerColorOption.ColorRgb),
-            ValueType = typeof(string),
+            Text = "Chọn màu",
+            UseColumnTextForButtonValue = false,
             FillWeight = 100,
-            FlatStyle = FlatStyle.Flat
+            SortMode = DataGridViewColumnSortMode.NotSortable
         });
         _layers.Columns.Add(new DataGridViewComboBoxColumn
         {
@@ -89,7 +100,8 @@ public sealed class ExportSettingsForm : Form
             ValueMember = nameof(LayerLineTypeOption.Value),
             ValueType = typeof(int),
             FillWeight = 135,
-            FlatStyle = FlatStyle.Flat
+            FlatStyle = FlatStyle.Flat,
+            SortMode = DataGridViewColumnSortMode.NotSortable
         });
         _layers.Columns.Add(new DataGridViewComboBoxColumn
         {
@@ -100,7 +112,16 @@ public sealed class ExportSettingsForm : Form
             ValueMember = nameof(LayerLineWeightOption.Millimeters),
             ValueType = typeof(double),
             FillWeight = 90,
-            FlatStyle = FlatStyle.Flat
+            FlatStyle = FlatStyle.Flat,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        });
+        _layers.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Appearance",
+            HeaderText = "Xem trước",
+            FillWeight = 85,
+            ReadOnly = true,
+            SortMode = DataGridViewColumnSortMode.NotSortable
         });
         _layers.Columns[1].ReadOnly = true;
         _layers.Columns[2].ReadOnly = true;
@@ -111,8 +132,24 @@ public sealed class ExportSettingsForm : Form
         _layers.AllowUserToResizeRows = false;
         _layers.EditMode = DataGridViewEditMode.EditOnEnter;
         _layers.RowTemplate.Height = 28;
+        _layers.Columns["Appearance"]!.DefaultCellStyle.SelectionBackColor = _layers.DefaultCellStyle.BackColor;
+        _layers.Columns["Appearance"]!.DefaultCellStyle.SelectionForeColor = _layers.DefaultCellStyle.ForeColor;
         _layers.ColumnHeadersHeight = 30;
         _layers.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+        _layers.CellPainting += PaintLayerCells;
+        _layers.CellContentClick += HandleLayerCellClick;
+        _layers.CellToolTipTextNeeded += SetLayerCellToolTip;
+        _layers.EditingControlShowing += ConfigureLineTypeEditor;
+        _layers.CurrentCellDirtyStateChanged += (_, _) =>
+        {
+            if (_layers.IsCurrentCellDirty && _layers.CurrentCell is DataGridViewComboBoxCell)
+                _layers.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        };
+        _layers.CellValueChanged += (_, e) =>
+        {
+            if (e.RowIndex >= 0 && _layers.Columns[e.ColumnIndex].Name is "Color" or "LineType" or "LineWeight")
+                _layers.InvalidateCell(_layers.Columns["Appearance"]!.Index, e.RowIndex);
+        };
         _bend.Items.AddRange(new object[] { "Giữ nguyên đường dài", "Chỉ đánh dấu 2 đầu" });
         _alignment.Items.AddRange(new object[] { "Căn trái", "Căn giữa" });
         Populate(settings);
@@ -192,6 +229,8 @@ public sealed class ExportSettingsForm : Form
         buttons.Controls.Add(new Button { Text = "Chọn tất cả", AutoSize = true, Margin = new Padding(0, 0, 8, 0) }.Also(b => b.Click += (_, _) => SetLayers(true)));
         buttons.Controls.Add(new Button { Text = "Bỏ chọn tất cả", AutoSize = true, Margin = new Padding(0, 0, 8, 0) }.Also(b => b.Click += (_, _) => SetLayers(false)));
         buttons.Controls.Add(new Button { Text = "Mặc định Outer + Interior", AutoSize = true }.Also(b => b.Click += (_, _) => SetDefaultLayers()));
+        buttons.Controls.Add(new Button { Text = "Màu mặc định", AutoSize = true, Margin = new Padding(8, 0, 0, 0) }
+            .Also(b => b.Click += (_, _) => ResetSelectedLayerColors()));
         _layers.Dock = DockStyle.Fill;
         group.Controls.Add(_layers); group.Controls.Add(buttons); return group;
     }
@@ -257,16 +296,14 @@ public sealed class ExportSettingsForm : Form
             bool enabled = layer.Default;
             if (s.LayerSettings.TryGetValue(layer.Name, out var stored)) enabled = stored.Split('|')[0].Equals("true", StringComparison.OrdinalIgnoreCase);
             var style = s.LayerStyles.TryGetValue(layer.Name, out var configuredStyle) ? configuredStyle : new LayerExportStyle();
-            var color = LayerColors.Any(option => string.Equals(option.ColorRgb, style.ColorRgb, StringComparison.Ordinal))
-                ? style.ColorRgb
-                : "";
+            var color = IsValidRgb(style.ColorRgb) ? style.ColorRgb : "";
             var lineType = LayerLineTypes.Any(option => option.Value == style.LineType)
                 ? style.LineType
                 : 37648;
             var lineWeight = LayerLineWeights.Any(option => option.Millimeters == style.LineWeightMm)
                 ? style.LineWeightMm
                 : 0.5;
-            _layers.Rows.Add(enabled, layer.Name, layer.Description, color, lineType, lineWeight);
+            _layers.Rows.Add(enabled, layer.Name, layer.Description, color, lineType, lineWeight, DBNull.Value);
         }
     }
 
@@ -361,6 +398,246 @@ public sealed class ExportSettingsForm : Form
     }
     private void SetLayers(bool value) { foreach (DataGridViewRow row in _layers.Rows) row.Cells[0].Value = value; }
     private void SetDefaultLayers() { for (int i = 0; i < _layers.Rows.Count; i++) _layers.Rows[i].Cells[0].Value = i < 2; }
+    private void ResetSelectedLayerColors()
+    {
+        var rows = _layers.SelectedRows.Cast<DataGridViewRow>().ToArray();
+        if (rows.Length == 0 && _layers.CurrentRow is { } currentRow)
+            rows = new[] { currentRow };
+        foreach (var row in rows)
+            row.Cells["Color"].Value = "";
+        _layers.Invalidate();
+    }
+
+    private void HandleLayerCellClick(object? sender, DataGridViewCellEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.ColumnIndex != _layers.Columns["Color"]!.Index)
+            return;
+
+        var cell = _layers.Rows[e.RowIndex].Cells["Color"];
+        using var picker = new LayerColorPickerForm(Convert.ToString(cell.Value, CultureInfo.InvariantCulture) ?? "");
+        if (picker.ShowDialog(this) == DialogResult.OK)
+        {
+            cell.Value = picker.ColorRgb;
+            _layers.InvalidateCell(e.ColumnIndex, e.RowIndex);
+            _layers.InvalidateCell(_layers.Columns["Appearance"]!.Index, e.RowIndex);
+        }
+    }
+
+    private void PaintLayerCells(object? sender, DataGridViewCellPaintingEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.ColumnIndex < 0)
+            return;
+
+        var columnName = _layers.Columns[e.ColumnIndex].Name;
+        if (columnName == "Color")
+        {
+            PaintColorCell(e);
+            return;
+        }
+
+        if (columnName == "LineType")
+        {
+            PaintLineTypeCell(e);
+            return;
+        }
+
+        if (columnName == "Appearance")
+            PaintAppearanceCell(e);
+    }
+
+    private void PaintColorCell(DataGridViewCellPaintingEventArgs e)
+    {
+        if (e.Graphics is not { } graphics)
+            return;
+        e.PaintBackground(e.CellBounds, true);
+        var bounds = Rectangle.Inflate(e.CellBounds, -2, -2);
+        var state = _layers.CurrentCellAddress.X == e.ColumnIndex && _layers.CurrentCellAddress.Y == e.RowIndex
+            ? PushButtonState.Pressed
+            : PushButtonState.Normal;
+        ButtonRenderer.DrawButton(graphics, bounds, state);
+
+        var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture) ?? "";
+        var swatch = new Rectangle(bounds.X + 6, bounds.Y + (bounds.Height - 15) / 2, 22, 15);
+        DrawColorSwatch(graphics, swatch, ParseRgb(value));
+        using var border = new Pen(Color.FromArgb(110, 110, 110));
+        graphics.DrawRectangle(border, swatch);
+        var textBounds = new Rectangle(swatch.Right + 5, bounds.Y, bounds.Right - swatch.Right - 8, bounds.Height);
+        TextRenderer.DrawText(graphics, GetColorLabel(value), _layers.Font, textBounds,
+            SystemColors.ControlText, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        e.Paint(e.CellBounds, DataGridViewPaintParts.Border);
+        e.Handled = true;
+    }
+
+    private void PaintLineTypeCell(DataGridViewCellPaintingEventArgs e)
+    {
+        if (e.Graphics is not { } graphics)
+            return;
+        e.PaintBackground(e.CellBounds, true);
+        var bounds = e.CellBounds;
+        var arrowBounds = new Rectangle(bounds.Right - 19, bounds.Y + 1, 18, bounds.Height - 2);
+        ComboBoxRenderer.DrawDropDownButton(graphics, arrowBounds, ComboBoxState.Normal);
+        var lineType = Convert.ToInt32(e.Value ?? 37648, CultureInfo.InvariantCulture);
+        var sampleBounds = new Rectangle(bounds.X + 5, bounds.Y + 2, Math.Max(24, Math.Min(38, bounds.Width / 3)), bounds.Height - 4);
+        DrawLineSample(graphics, sampleBounds, lineType, 37648, 0.5, Color.FromArgb(55, 62, 70));
+        var label = LayerLineTypes.FirstOrDefault(option => option.Value == lineType)?.Name ?? "Mặc định";
+        var textBounds = new Rectangle(sampleBounds.Right + 3, bounds.Y, arrowBounds.Left - sampleBounds.Right - 5, bounds.Height);
+        TextRenderer.DrawText(graphics, label, _layers.Font, textBounds,
+            e.CellStyle?.ForeColor ?? SystemColors.ControlText, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        e.Paint(e.CellBounds, DataGridViewPaintParts.Border);
+        e.Handled = true;
+    }
+
+    private void PaintAppearanceCell(DataGridViewCellPaintingEventArgs e)
+    {
+        if (e.Graphics is not { } graphics)
+            return;
+        e.PaintBackground(e.CellBounds, true);
+        var row = _layers.Rows[e.RowIndex];
+        var bounds = Rectangle.Inflate(e.CellBounds, -7, -3);
+        var lineType = Convert.ToInt32(row.Cells["LineType"].Value ?? 37648, CultureInfo.InvariantCulture);
+        var lineWeight = Convert.ToDouble(row.Cells["LineWeight"].Value ?? 0.5, CultureInfo.InvariantCulture);
+        var color = ParseRgb(Convert.ToString(row.Cells["Color"].Value, CultureInfo.InvariantCulture) ?? "");
+        DrawLineSample(graphics, bounds, lineType, 37648, lineWeight, color ?? Color.FromArgb(75, 82, 90));
+        e.Paint(e.CellBounds, DataGridViewPaintParts.Border);
+        e.Handled = true;
+    }
+
+    private void ConfigureLineTypeEditor(object? sender, DataGridViewEditingControlShowingEventArgs e)
+    {
+        if (e.Control is not ComboBox comboBox)
+            return;
+
+        comboBox.DrawItem -= DrawLineTypeOption;
+        if (_layers.CurrentCell?.OwningColumn?.Name == "LineType")
+        {
+            comboBox.DrawMode = DrawMode.OwnerDrawFixed;
+            comboBox.ItemHeight = 24;
+            comboBox.DrawItem += DrawLineTypeOption;
+        }
+        else
+        {
+            comboBox.DrawMode = DrawMode.Normal;
+        }
+    }
+
+    private void DrawLineTypeOption(object? sender, DrawItemEventArgs e)
+    {
+        if (sender is not ComboBox comboBox || e.Index < 0 || e.Graphics is not { } graphics
+            || comboBox.Items[e.Index] is not LayerLineTypeOption option)
+            return;
+
+        e.DrawBackground();
+        var sampleBounds = new Rectangle(e.Bounds.X + 5, e.Bounds.Y + 2, 50, e.Bounds.Height - 4);
+        DrawLineSample(graphics, sampleBounds, option.Value, 37648, 0.5, SystemColors.ControlText);
+        var textBounds = new Rectangle(sampleBounds.Right + 6, e.Bounds.Y, e.Bounds.Right - sampleBounds.Right - 6, e.Bounds.Height);
+        TextRenderer.DrawText(graphics, option.Name, comboBox.Font, textBounds,
+            e.ForeColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        e.DrawFocusRectangle();
+    }
+
+    private void SetLayerCellToolTip(object? sender, DataGridViewCellToolTipTextNeededEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.ColumnIndex < 0)
+            return;
+
+        var row = _layers.Rows[e.RowIndex];
+        switch (_layers.Columns[e.ColumnIndex].Name)
+        {
+            case "Color":
+                var rgb = Convert.ToString(row.Cells["Color"].Value, CultureInfo.InvariantCulture) ?? "";
+                e.ToolTipText = string.IsNullOrEmpty(rgb) ? "Đang dùng màu mặc định của Inventor. Nhấp để chọn màu." : $"{GetColorLabel(rgb)} ({rgb.Replace(';', ',')}). Nhấp để đổi màu.";
+                break;
+            case "LineType":
+                e.ToolTipText = LayerLineTypes.FirstOrDefault(option =>
+                    option.Value == Convert.ToInt32(row.Cells["LineType"].Value ?? 37648, CultureInfo.InvariantCulture))?.Name ?? "Mặc định";
+                break;
+            case "Appearance":
+                e.ToolTipText = $"{GetColorLabel(Convert.ToString(row.Cells["Color"].Value, CultureInfo.InvariantCulture) ?? "")}; "
+                    + $"{LayerLineTypes.FirstOrDefault(option => option.Value == Convert.ToInt32(row.Cells["LineType"].Value ?? 37648, CultureInfo.InvariantCulture))?.Name}; "
+                    + $"{Convert.ToDouble(row.Cells["LineWeight"].Value ?? 0.5, CultureInfo.InvariantCulture):0.00} mm";
+                break;
+        }
+    }
+
+    private static void DrawLineSample(Graphics graphics, Rectangle bounds, int lineType, int defaultLineType,
+        double lineWeight, Color color)
+    {
+        if (bounds.Width < 4 || bounds.Height < 4)
+            return;
+
+        var style = lineType == defaultLineType ? DashStyle.Solid : lineType switch
+        {
+            37634 or 37641 => DashStyle.Dash,
+            37636 => DashStyle.Dot,
+            37638 => DashStyle.DashDot,
+            37644 => DashStyle.DashDotDot,
+            _ => DashStyle.Solid
+        };
+        var width = (float)Math.Clamp(lineWeight * 2.0, 1.0, 4.0);
+        using var pen = new Pen(color, width) { DashStyle = style };
+        var y = bounds.Top + bounds.Height / 2f;
+        var smoothingMode = graphics.SmoothingMode;
+        try
+        {
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            graphics.DrawLine(pen, bounds.Left + 2, y, bounds.Right - 2, y);
+        }
+        finally
+        {
+            graphics.SmoothingMode = smoothingMode;
+        }
+    }
+
+    private static void DrawColorSwatch(Graphics graphics, Rectangle bounds, Color? color)
+    {
+        if (color is { } selectedColor)
+        {
+            using var brush = new SolidBrush(selectedColor);
+            graphics.FillRectangle(brush, bounds);
+            return;
+        }
+
+        using var background = new SolidBrush(SystemColors.ControlLightLight);
+        using var hatch = new HatchBrush(HatchStyle.LargeCheckerBoard, Color.LightGray, Color.White);
+        graphics.FillRectangle(background, bounds);
+        graphics.FillRectangle(hatch, bounds);
+        TextRenderer.DrawText(graphics, "A", SystemFonts.MessageBoxFont, bounds, Color.DimGray,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+    }
+
+    private static Color? ParseRgb(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var parts = value.Split(';');
+        if (parts.Length != 3
+            || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var red)
+            || !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var green)
+            || !int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var blue)
+            || red is < 0 or > 255 || green is < 0 or > 255 || blue is < 0 or > 255)
+            return null;
+        return Color.FromArgb(red, green, blue);
+    }
+
+    private static bool IsValidRgb(string value) => ParseRgb(value).HasValue;
+
+    private static string GetColorLabel(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "Mặc định";
+        var color = ParseRgb(value);
+        if (color is null)
+            return "Mặc định";
+        return LayerColors.FirstOrDefault(option => option.Color.ToArgb() == color.Value.ToArgb())?.Name
+            ?? $"#{color.Value.R:X2}{color.Value.G:X2}{color.Value.B:X2}";
+    }
+
+    private static string FormatRgb(Color color) => string.Join(";",
+        color.R.ToString(CultureInfo.InvariantCulture),
+        color.G.ToString(CultureInfo.InvariantCulture),
+        color.B.ToString(CultureInfo.InvariantCulture));
+
     private void SetBendInputs() { bool active = _bend.SelectedIndex == 1; _upLen.Enabled = active; _upInset.Enabled = active; _downLen.Enabled = active; _downInset.Enabled = active; }
     private void SetTextInputs() { _height.Enabled = _text.Checked; _gap.Enabled = _text.Checked; _yOffset.Enabled = _text.Checked; _alignment.Enabled = _text.Checked; }
     private static Label FieldLabel(string text) => new() { Text = text, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, 0, 2) };
@@ -424,9 +701,127 @@ public sealed class ExportSettingsForm : Form
         NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite | NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
         CultureInfo.CurrentCulture);
 
-    private sealed record LayerColorOption(string Name, string ColorRgb);
+    private sealed record LayerColorOption(string Name, Color Color)
+    {
+        public string ColorRgb => FormatRgb(Color);
+    }
     private sealed record LayerLineTypeOption(string Name, int Value);
     private sealed record LayerLineWeightOption(string Name, double Millimeters);
+
+    private sealed class LayerColorPickerForm : Form
+    {
+        private readonly string _currentRgb;
+        public string ColorRgb { get; private set; }
+
+        public LayerColorPickerForm(string currentRgb)
+        {
+            _currentRgb = currentRgb;
+            ColorRgb = currentRgb;
+            Text = "Chọn màu layer";
+            StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MinimizeBox = false;
+            MaximizeBox = false;
+            ShowInTaskbar = false;
+            ClientSize = new Size(310, 245);
+
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(10),
+                ColumnCount = 1,
+                RowCount = 3
+            };
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+            layout.Controls.Add(new Label
+            {
+                Text = "Bảng màu cơ bản · chọn “Màu khác…” để nhập màu tùy chỉnh",
+                Dock = DockStyle.Fill,
+                AutoEllipsis = true,
+                TextAlign = System.Drawing.ContentAlignment.MiddleLeft
+            }, 0, 0);
+
+            var palette = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 8,
+                RowCount = 5,
+                Padding = new Padding(1)
+            };
+            for (var column = 0; column < palette.ColumnCount; column++)
+                palette.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.5F));
+            for (var row = 0; row < palette.RowCount; row++)
+                palette.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+
+            foreach (var option in LayerColors)
+            {
+                var tile = new Button
+                {
+                    Dock = DockStyle.Fill,
+                    Margin = new Padding(2),
+                    BackColor = option.Color,
+                    FlatStyle = FlatStyle.Flat,
+                    Text = string.Equals(option.ColorRgb, currentRgb, StringComparison.Ordinal) ? "✓" : "",
+                    ForeColor = option.Color.GetBrightness() < 0.5F ? Color.White : Color.Black,
+                    AccessibleName = option.Name,
+                    TabStop = true
+                };
+                tile.FlatAppearance.BorderColor = string.Equals(option.ColorRgb, currentRgb, StringComparison.Ordinal)
+                    ? SystemColors.Highlight
+                    : SystemColors.ControlDark;
+                tile.FlatAppearance.BorderSize = string.Equals(option.ColorRgb, currentRgb, StringComparison.Ordinal) ? 2 : 1;
+                _toolTip.SetToolTip(tile, option.Name);
+                tile.Click += (_, _) => SelectColor(option.ColorRgb);
+                var index = Array.IndexOf(LayerColors, option);
+                palette.Controls.Add(tile, index % palette.ColumnCount, index / palette.ColumnCount);
+            }
+
+            var buttons = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false
+            };
+            var cancel = new Button { Text = "Hủy", DialogResult = DialogResult.Cancel, AutoSize = true };
+            var custom = new Button { Text = "Màu khác…", AutoSize = true };
+            var defaultColor = new Button { Text = "Mặc định", AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
+            custom.Click += (_, _) => PickCustomColor();
+            defaultColor.Click += (_, _) => SelectColor("");
+            buttons.Controls.Add(cancel);
+            buttons.Controls.Add(custom);
+            buttons.Controls.Add(defaultColor);
+            layout.Controls.Add(palette, 0, 1);
+            layout.Controls.Add(buttons, 0, 2);
+            Controls.Add(layout);
+            CancelButton = cancel;
+            FormClosed += (_, _) => _toolTip.Dispose();
+        }
+
+        private readonly ToolTip _toolTip = new();
+
+        private void SelectColor(string value)
+        {
+            ColorRgb = value;
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+
+        private void PickCustomColor()
+        {
+            using var dialog = new ColorDialog
+            {
+                AllowFullOpen = true,
+                AnyColor = true,
+                FullOpen = true,
+                SolidColorOnly = true,
+                Color = ParseRgb(_currentRgb) ?? Color.Black
+            };
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+                SelectColor(FormatRgb(dialog.Color));
+        }
+    }
 }
 
 internal static class ControlExtensions

@@ -254,11 +254,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\DxfExporterPro_Source\\InventorDxfExporter.csproj",
+      "projectUniqueName": "E:\\DXF Exporter Pro\\InventorDxfExporter.csproj",
       "projectName": "InventorDxfExporter",
-      "projectPath": "E:\\DxfExporterPro_Source\\InventorDxfExporter.csproj",
+      "projectPath": "E:\\DXF Exporter Pro\\InventorDxfExporter.csproj",
       "packagesPath": "C:\\Users\\ptqn9\\.nuget\\packages\\",
-      "outputPath": "E:\\DxfExporterPro_Source\\obj\\",
+      "outputPath": "E:\\DXF Exporter Pro\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\ptqn9\\AppData\\Roaming\\NuGet\\NuGet.Config",

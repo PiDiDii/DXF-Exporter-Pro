@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "xoyMu+XOmxM=",
+  "dgSpecHash": "IB/4YOTSWbc=",
   "success": true,
-  "projectFilePath": "E:\\DxfExporterPro_Source\\Preview\\ExportSettingsPreview.csproj",
+  "projectFilePath": "E:\\DXF Exporter Pro\\Preview\\ExportSettingsPreview.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\ptqn9\\.nuget\\packages\\closedxml\\0.104.2\\closedxml.0.104.2.nupkg.sha512",
     "C:\\Users\\ptqn9\\.nuget\\packages\\closedxml.parser\\1.2.0\\closedxml.parser.1.2.0.nupkg.sha512",

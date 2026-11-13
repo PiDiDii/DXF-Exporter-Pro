@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "E:\\DxfExporterPro_Source\\Preview\\ExportSettingsPreview.csproj": {}
+    "E:\\DXF Exporter Pro\\Preview\\ExportSettingsPreview.csproj": {}
   },
   "projects": {
-    "E:\\DxfExporterPro_Source\\InventorDxfExporter.csproj": {
+    "E:\\DXF Exporter Pro\\InventorDxfExporter.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\DxfExporterPro_Source\\InventorDxfExporter.csproj",
+        "projectUniqueName": "E:\\DXF Exporter Pro\\InventorDxfExporter.csproj",
         "projectName": "InventorDxfExporter",
-        "projectPath": "E:\\DxfExporterPro_Source\\InventorDxfExporter.csproj",
+        "projectPath": "E:\\DXF Exporter Pro\\InventorDxfExporter.csproj",
         "packagesPath": "C:\\Users\\ptqn9\\.nuget\\packages\\",
-        "outputPath": "E:\\DxfExporterPro_Source\\obj\\",
+        "outputPath": "E:\\DXF Exporter Pro\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\ptqn9\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -366,14 +366,14 @@
         }
       }
     },
-    "E:\\DxfExporterPro_Source\\Preview\\ExportSettingsPreview.csproj": {
+    "E:\\DXF Exporter Pro\\Preview\\ExportSettingsPreview.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\DxfExporterPro_Source\\Preview\\ExportSettingsPreview.csproj",
+        "projectUniqueName": "E:\\DXF Exporter Pro\\Preview\\ExportSettingsPreview.csproj",
         "projectName": "ExportSettingsPreview",
-        "projectPath": "E:\\DxfExporterPro_Source\\Preview\\ExportSettingsPreview.csproj",
+        "projectPath": "E:\\DXF Exporter Pro\\Preview\\ExportSettingsPreview.csproj",
         "packagesPath": "C:\\Users\\ptqn9\\.nuget\\packages\\",
-        "outputPath": "E:\\DxfExporterPro_Source\\Preview\\obj\\",
+        "outputPath": "E:\\DXF Exporter Pro\\Preview\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\ptqn9\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -391,8 +391,8 @@
             "framework": "net10.0-windows7.0",
             "targetAlias": "net10.0-windows",
             "projectReferences": {
-              "E:\\DxfExporterPro_Source\\InventorDxfExporter.csproj": {
-                "projectPath": "E:\\DxfExporterPro_Source\\InventorDxfExporter.csproj"
+              "E:\\DXF Exporter Pro\\InventorDxfExporter.csproj": {
+                "projectPath": "E:\\DXF Exporter Pro\\InventorDxfExporter.csproj"
               }
             }
           }

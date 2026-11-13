@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\DxfExporterPro_Source\\Skill\\templates\\addin-template\\Inventor2027Addin.csproj",
+      "projectUniqueName": "E:\\DXF Exporter Pro\\Skill\\templates\\addin-template\\Inventor2027Addin.csproj",
       "projectName": "Inventor2027Addin",
-      "projectPath": "E:\\DxfExporterPro_Source\\Skill\\templates\\addin-template\\Inventor2027Addin.csproj",
+      "projectPath": "E:\\DXF Exporter Pro\\Skill\\templates\\addin-template\\Inventor2027Addin.csproj",
       "packagesPath": "C:\\Users\\ptqn9\\.nuget\\packages\\",
-      "outputPath": "E:\\DxfExporterPro_Source\\Skill\\templates\\addin-template\\obj\\",
+      "outputPath": "E:\\DXF Exporter Pro\\Skill\\templates\\addin-template\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\ptqn9\\AppData\\Roaming\\NuGet\\NuGet.Config",
