@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DxfProcessorValidation")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7e04332d47671629da80f4066d038fd16bacf7e0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+94bf308c7ddcd3557b48ca56f47416ee7ec8ae09")]
 [assembly: System.Reflection.AssemblyProductAttribute("DxfProcessorValidation")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DxfProcessorValidation")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

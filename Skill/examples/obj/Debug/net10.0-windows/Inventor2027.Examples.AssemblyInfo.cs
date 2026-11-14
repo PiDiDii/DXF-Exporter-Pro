@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Inventor2027.Examples")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a892da1d09c4099dcf0d95cd3aec64251c1b7c8c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+94bf308c7ddcd3557b48ca56f47416ee7ec8ae09")]
 [assembly: System.Reflection.AssemblyProductAttribute("Inventor2027.Examples")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Inventor2027.Examples")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
