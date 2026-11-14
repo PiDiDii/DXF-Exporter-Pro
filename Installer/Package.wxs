@@ -1,0 +1,30 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+    Name="Inventor DXF Exporter Pro"
+    Manufacturer="PiDiDii"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="{C95E6FF4-13D3-4AD4-85C4-09F929F2244E}"
+    Scope="perUser"
+    InstallerVersion="500">
+    <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
+      DowngradeErrorMessage="A newer version of Inventor DXF Exporter Pro is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="REINSTALLMODE" Value="amus" />
+    <ui:WixUI Id="WixUI_Minimal" />
+    <Feature Id="Main" Title="Inventor DXF Exporter Pro" Level="1">
+      <ComponentGroupRef Id="AddinFiles" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="AppDataFolder">
+      <Directory Id="AutodeskFolder" Name="Autodesk">
+        <Directory Id="InventorFolder" Name="Inventor 2027">
+          <Directory Id="AddinsFolder" Name="Addins" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+  </Fragment>
+</Wix>

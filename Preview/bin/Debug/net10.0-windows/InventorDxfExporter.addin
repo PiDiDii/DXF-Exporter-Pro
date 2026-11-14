@@ -5,9 +5,9 @@
   <Description>Xuất DXF, BOM và chuyển đổi STEP cho Inventor 2027.</Description>
   <Assembly>InventorDxfExporter.dll</Assembly>
   <OSType>Win64</OSType>
-  <LoadAutomatically>0</LoadAutomatically>
+  <LoadAutomatically>1</LoadAutomatically>
   <UserUnloadable>1</UserUnloadable>
   <Hidden>0</Hidden>
-  <LoadBehavior>10</LoadBehavior>
+  <LoadBehavior>1</LoadBehavior>
   <UserInterfaceVersion>1</UserInterfaceVersion>
 </Addin>

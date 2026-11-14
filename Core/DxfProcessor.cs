@@ -52,16 +52,48 @@ public sealed class DxfProcessor
 
     public static bool ValidateDxfLines(IList<string> lines)
     {
-        bool section = false, entities = false, endSection = false, eof = false;
-        for (int i = 0; i < lines.Count - 1; i++)
+        if (lines.Count < 8 || lines.Count % 2 != 0) return false;
+
+        bool entitiesSection = false, hasEntity = false, eof = false;
+        string? activeSection = null;
+        for (int i = 0; i < lines.Count; i += 2)
         {
-            string code = lines[i].Trim().ToUpperInvariant(), value = lines[i + 1].Trim().ToUpperInvariant();
-            if (code == "0" && value == "SECTION") section = true;
-            if (code == "2" && value == "ENTITIES") entities = true;
-            if (code == "0" && value == "ENDSEC") endSection = true;
-            if (code == "0" && value == "EOF") eof = true;
+            if (!int.TryParse(lines[i].Trim(), NumberStyles.Integer, Invariant, out var groupCode)
+                || groupCode is < 0 or > 1071)
+                return false;
+
+            var value = lines[i + 1].Trim();
+            if (groupCode == 0 && value.Equals("SECTION", StringComparison.OrdinalIgnoreCase))
+            {
+                if (activeSection is not null || i + 3 >= lines.Count
+                    || !int.TryParse(lines[i + 2].Trim(), NumberStyles.Integer, Invariant, out var sectionCode)
+                    || sectionCode != 2 || string.IsNullOrWhiteSpace(lines[i + 3]))
+                    return false;
+
+                activeSection = lines[i + 3].Trim();
+                if (activeSection.Equals("ENTITIES", StringComparison.OrdinalIgnoreCase))
+                    entitiesSection = true;
+            }
+            else if (groupCode == 0 && value.Equals("ENDSEC", StringComparison.OrdinalIgnoreCase))
+            {
+                if (activeSection is null) return false;
+                activeSection = null;
+            }
+            else if (groupCode == 0 && value.Equals("EOF", StringComparison.OrdinalIgnoreCase))
+            {
+                if (activeSection is not null || i != lines.Count - 2) return false;
+                eof = true;
+            }
+            else if (groupCode == 0
+                && activeSection?.Equals("ENTITIES", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                hasEntity = true;
+            }
+
+            if (eof && i != lines.Count - 2) return false;
         }
-        return section && entities && endSection && eof;
+
+        return activeSection is null && entitiesSection && hasEntity && eof;
     }
 
     public static int ConvertBendLinesToEndMarks(List<string> lines, DxfProcessOptions options)

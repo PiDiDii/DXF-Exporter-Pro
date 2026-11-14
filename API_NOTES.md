@@ -14,7 +14,9 @@ Sources: local workspace `skills/inventor-2027-addin/api/API_INDEX.md`, row `Inv
 
 ## Flat-pattern DXF layer styling
 
-The Inventor 2027 `DataIO.WriteDataToFile` flat-pattern DXF options accept per-layer keys in the form `{LayerArgument}Color=R;G;B`, `{LayerArgument}LineType=<LineTypeEnum value>`, and `{LayerArgument}LineWeight=<double in centimeters>`. The exporter keeps lineweight values in millimeters in settings and converts them to centimeters for the API option string. DXF 2000 is selected so lineweight metadata is supported.
+The Inventor 2027 `DataIO.WriteDataToFile` flat-pattern DXF options accept per-layer keys in the form `{LayerArgument}Color=R;G;B`, `{LayerArgument}LineType=<LineTypeEnum value>`, and `{LayerArgument}LineWeight=<double in centimeters>`. The exporter targets `AcadVersion=R12`, does not emit custom layer colors, and omits the lineweight option because the R12 target predates DXF lineweight metadata. Existing color values in older INI/profile files are ignored.
+
+The `InvisibleLayers` option is a semicolon-separated list of layer names. Both the primary R12 option string and the reduced fallback option string must include the same layer mappings and hidden-layer list; otherwise a successful fallback export would silently restore Inventor's default visible layers.
 
 The listed line-type values (default 37648, continuous 37633, dashed 37634, dotted 37636, dash-dotted 37638, dashed-hidden 37641, chain 37644) were verified against the installed Inventor 2027 interop and Autodesk's `LineTypeEnum` reference. This verifies option construction only; DXF export has not been runtime-tested in Inventor.
 

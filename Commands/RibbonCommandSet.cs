@@ -20,10 +20,11 @@ public sealed class RibbonCommandSet
 
     public void Activate(bool firstTime)
     {
+        RemoveRetiredRibbonTabs();
+
         var convert = new ConvertStepCommand(_application);
         var export = new ExportDxfCommand(_application);
         var bom = new ExportBomCommand(_application);
-        var settings = new SettingsCommand(_application);
 
         var convertButton = Define("Convert STEP", "ConvertStep",
             "Chuyển các part STEP trong Assembly thành Sheet Metal và tạo Flat Pattern.", "Convert STEP", IconKind.Convert, convert.Execute);
@@ -31,33 +32,58 @@ public sealed class RibbonCommandSet
             "Kiểm tra, xem trước và xuất DXF cho part Sheet Metal trong tài liệu hiện hành.", "Xuất DXF", IconKind.Dxf, export.Execute);
         var bomButton = Define("Xuất BOM", "ExportBom",
             "Tạo bảng BOM Excel (.xlsx) bằng ClosedXML; không yêu cầu cài Microsoft Excel.", "Xuất BOM", IconKind.Bom, bom.Execute);
-        var settingsButton = Define("Cài đặt", "Settings",
-            "Thiết lập layer, đường chấn, nội dung TEXT và cấu hình dự án.", "Cài đặt", IconKind.Settings, settings.Execute);
 
-        // Versioned IDs let Inventor add the revised layout to existing installations (FirstTime may be false).
-        AddTab("Assembly", "DXF Exporter", "InventorDxfExporter.Assembly.V3.Tab",
-            new PanelLayout("Chuẩn bị", "InventorDxfExporter.Assembly.V3.PreparePanel", new[]
+        // Versioned IDs let Inventor replace the previous layout for existing installations.
+        AddTab("Assembly", "DXF Exporter", "InventorDxfExporter.Assembly.V4.Tab",
+            new PanelLayout("Thao tác", "InventorDxfExporter.Assembly.V4.CommandsPanel", new[]
             {
-                new ButtonLayout(convertButton)
-            }),
-            new PanelLayout("Xuất", "InventorDxfExporter.Assembly.V3.ExportPanel", new[]
-            {
-                new ButtonLayout(exportButton), new ButtonLayout(bomButton)
-            }),
-            new PanelLayout("Thiết lập", "InventorDxfExporter.Assembly.V3.SettingsPanel", new[]
-            {
-                new ButtonLayout(settingsButton)
+                new ButtonLayout(convertButton), new ButtonLayout(exportButton), new ButtonLayout(bomButton)
             }));
 
-        AddTab("Part", "DXF Exporter", "InventorDxfExporter.Part.V3.Tab",
-            new PanelLayout("Xuất", "InventorDxfExporter.Part.V3.ExportPanel", new[]
+        AddTab("Part", "DXF Exporter", "InventorDxfExporter.Part.V4.Tab",
+            new PanelLayout("Xuất", "InventorDxfExporter.Part.V4.ExportPanel", new[]
             {
                 new ButtonLayout(exportButton), new ButtonLayout(bomButton)
-            }),
-            new PanelLayout("Thiết lập", "InventorDxfExporter.Part.V3.SettingsPanel", new[]
-            {
-                new ButtonLayout(settingsButton)
             }));
+    }
+
+    private void RemoveRetiredRibbonTabs()
+    {
+        var retiredTabNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "InventorDxfExporter.Assembly.V1.UtilitiesTab",
+            "InventorDxfExporter.Part.V1.UtilitiesTab",
+            "InventorDxfExporter.Assembly.V3.Tab",
+            "InventorDxfExporter.Part.V3.Tab"
+        };
+        foreach (var ribbonName in new[] { "Assembly", "Part" })
+        {
+            try
+            {
+                var tabs = _application.UserInterfaceManager.Ribbons[ribbonName].RibbonTabs;
+                for (var index = tabs.Count; index >= 1; index--)
+                {
+                    var tab = tabs[index];
+                    if (!retiredTabNames.Contains(tab.InternalName))
+                        continue;
+
+                    try
+                    {
+                        var internalName = tab.InternalName;
+                        tab.Delete();
+                        Trace.TraceInformation($"Đã xóa Ribbon tab cũ '{internalName}'.");
+                    }
+                    catch (System.Runtime.InteropServices.COMException ex)
+                    {
+                        Trace.TraceWarning($"Không thể xóa Ribbon tab cũ '{tab.InternalName}': {ex.Message}");
+                    }
+                }
+            }
+            catch (System.Runtime.InteropServices.COMException ex)
+            {
+                Trace.TraceWarning($"Không thể kiểm tra Ribbon '{ribbonName}' để dọn tab đã bỏ: {ex.Message}");
+            }
+        }
     }
 
     private ButtonDefinition Define(string displayName, string suffix, string description, string toolTip, IconKind iconKind, Action execute)
@@ -158,12 +184,6 @@ public sealed class RibbonCommandSet
                     graphics.DrawLine(grid, 40, 11, 40, 53);
                 }
                 break;
-            case IconKind.Settings:
-                DrawGear(graphics, blueFill, 32, 32, 22, 17, 12);
-                graphics.FillEllipse(whiteFill, 24, 24, 16, 16);
-                graphics.DrawEllipse(dark, 24, 24, 16, 16);
-                graphics.FillEllipse(paleFill, 28, 28, 8, 8);
-                break;
         }
         return bitmap;
     }
@@ -187,20 +207,6 @@ public sealed class RibbonCommandSet
     private static void FillDot(System.Drawing.Graphics graphics, System.Drawing.Brush brush, float x, float y, float diameter) =>
         graphics.FillEllipse(brush, x, y, diameter, diameter);
 
-    private static void DrawGear(System.Drawing.Graphics graphics, System.Drawing.Brush brush,
-        float centerX, float centerY, float outerRadius, float innerRadius, int teeth)
-    {
-        var points = new List<System.Drawing.PointF>(teeth * 4);
-        for (var i = 0; i < teeth * 4; i++)
-        {
-            double angle = -Math.PI / 2 + i * Math.PI * 2 / (teeth * 4);
-            float radius = i % 4 is 0 or 1 ? outerRadius : innerRadius;
-            points.Add(new System.Drawing.PointF(centerX + (float)Math.Cos(angle) * radius,
-                centerY + (float)Math.Sin(angle) * radius));
-        }
-        graphics.FillPolygon(brush, points.ToArray());
-    }
-
     public void Deactivate()
     {
         foreach (var pair in _subscriptions)
@@ -212,7 +218,7 @@ public sealed class RibbonCommandSet
         _definitions.Clear();
     }
 
-    private enum IconKind { Convert, Dxf, Bom, Settings }
+    private enum IconKind { Convert, Dxf, Bom }
     private sealed record PanelLayout(string Caption, string InternalName, ButtonLayout[] Buttons);
     private sealed record ButtonLayout(ButtonDefinition Definition);
     private sealed record IconPair(System.Drawing.Bitmap StandardBitmap, System.Drawing.Bitmap LargeBitmap, object StandardPicture, object LargePicture);

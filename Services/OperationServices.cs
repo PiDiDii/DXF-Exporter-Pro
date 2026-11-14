@@ -15,7 +15,7 @@ public interface IDxfExportService
 
 public interface IBomService
 {
-    string Export(IReadOnlyCollection<ExportItem> items, string outputDirectory);
+    string Export(IReadOnlyCollection<ExportItem> items, BomExportSettings settings);
 }
 
 public interface IPartInfoService

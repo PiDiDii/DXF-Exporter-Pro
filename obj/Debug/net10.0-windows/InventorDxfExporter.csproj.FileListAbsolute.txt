@@ -41,3 +41,19 @@ E:\DXF Exporter Pro\obj\Debug\net10.0-windows\InventorDxfExporter.dll
 E:\DXF Exporter Pro\obj\Debug\net10.0-windows\refint\InventorDxfExporter.dll
 E:\DXF Exporter Pro\obj\Debug\net10.0-windows\InventorDxfExporter.pdb
 E:\DXF Exporter Pro\obj\Debug\net10.0-windows\ref\InventorDxfExporter.dll
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-status-check-bin\InventorDxfExporter.addin
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-status-check-bin\InventorDxfExporter.deps.json
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-status-check-bin\InventorDxfExporter.dll
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-status-check-bin\InventorDxfExporter.pdb
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\InventorDxfExporter.addin
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\InventorDxfExporter.deps.json
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\InventorDxfExporter.dll
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\InventorDxfExporter.pdb
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-build-verify-bin\InventorDxfExporter.addin
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-build-verify-bin\InventorDxfExporter.deps.json
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-build-verify-bin\InventorDxfExporter.dll
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-build-verify-bin\InventorDxfExporter.pdb
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-final-build-bin\InventorDxfExporter.addin
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-final-build-bin\InventorDxfExporter.deps.json
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-final-build-bin\InventorDxfExporter.dll
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-final-build-bin\InventorDxfExporter.pdb

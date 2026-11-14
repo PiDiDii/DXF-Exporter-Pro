@@ -11,18 +11,19 @@ UI/Forms/   Form riêng cho Convert, DXF, BOM, Settings, preflight, preview, pro
 Commands/   Mỗi lệnh Ribbon một command; ribbon theo ngữ cảnh Assembly/Part
 Settings/   Đọc/ghi INI V14 và profile khách hàng/dự án
 Source/     Bản V14 gốc, không sửa; chuẩn đối chiếu hành vi
-Tests/      Chưa có bộ regression test tự động ở checkpoint này
+Tests/      Kiểm tra cấu trúc DXF không cần Inventor
 ```
 
 ## Đã nối vào add-in
 
-- Manifest/server lifecycle cho Inventor 2027, Ribbon có Convert STEP ở ngữ cảnh Assembly và Xuất DXF, Xuất BOM, Cài đặt ở Part/Assembly.
+- Manifest/server lifecycle cho Inventor 2027; Ribbon có Convert STEP ở ngữ cảnh Assembly và Xuất DXF, Xuất BOM ở Part/Assembly. Cài đặt được mở từ luồng xem trước Xuất DXF.
 - Nút Convert gọi service port từ V14; có lọc tên, hai chế độ Thickness, skip Flat Pattern, tolerance, log folder và hộp tiến trình/hủy.
 - Nút Xuất DXF gọi service duyệt Part/Assembly, tạo Flat Pattern khi chưa có, xuất DXF, post-process qua `Core/DxfProcessor`, cập nhật Description/Thickness và xuất BOM khi bật tùy chọn.
 - Có FastMode được khôi phục trạng thái trong `finally`, overwrite/skip/hỏi, cleanup DXF cũ của part suppressed, báo cáo kết quả và lỗi.
 - Có preflight, kiểm tra giá trị material/thickness chưa xác định và tên file dự kiến bị trùng; preview hiển thị tên DXF, vật liệu, độ dày, số lượng và cho bỏ chọn từng part trước khi xuất.
-- Cài đặt DXF cho phép chọn màu RGB, kiểu nét và độ dày riêng cho từng layer; thiết lập được lưu cùng profile và INI V14. DXF xuất theo định dạng 2000 để hỗ trợ lineweight.
-- BOM dùng ClosedXML, không gọi Microsoft Excel. Settings giữ đường dẫn/khóa INI V14; có profile theo khách/dự án.
+- Cài đặt DXF cho phép bật/tắt từng layer; màu layer không tùy chỉnh. DXF xuất theo định dạng AutoCAD R12 để tăng tương thích.
+- Add-in tự nạp khi mở tài liệu Inventor; báo cáo mỗi lần xuất có dấu thời gian và chỉ ghi DXF sau khi qua kiểm tra cấu trúc.
+- BOM dùng ClosedXML, không gọi Microsoft Excel; xuất vào workbook `.xlsx` mẫu, cấu hình cột/dòng và thư mục đích được lưu riêng. Chỉ các cột dữ liệu BOM được ánh xạ mới bị ghi đè; tên dự án/ngày trong mẫu được giữ nguyên. Hình ảnh hiện được để dành cho giai đoạn sau.
 
 ## Phần Giai đoạn 3 còn thiếu hoặc chưa được xác minh
 
@@ -52,6 +53,32 @@ Nếu Inventor được cài ở đường dẫn khác:
 ```
 
 Script sẽ build, gom DLL và dependency (bao gồm `ClosedXML.dll`) vào `dist\InventorDxfExporter`. Chép **toàn bộ file** trong thư mục đó vào `%APPDATA%\Autodesk\Inventor 2027\Addins`, sau đó nạp **Inventor DXF Exporter Pro** bằng Add-In Manager. Nếu build hoặc kiểm tra dependency fail thì chưa copy/nạp bản đó.
+
+### Cài đặt bằng MSI
+
+Để tạo MSI cài per-user và cập nhật đè bản MSI trước đó, chạy:
+
+```powershell
+.\build-installer.ps1
+```
+
+MSI được tạo tại `dist\InventorDxfExporter-Setup.msi`; mở file để cài hoặc chạy:
+
+```powershell
+msiexec.exe /i .\dist\InventorDxfExporter-Setup.msi
+```
+
+MSI có giao diện cài đặt/tiến trình/kết quả của Windows Installer; khi thành công sẽ hiện hộp thoại hoàn tất, khi lỗi Windows Installer sẽ báo lỗi thay vì thoát im lặng. MSI cài manifest và các dependency vào `%APPDATA%\Autodesk\Inventor 2027\Addins`. Các lần build dùng cùng Upgrade Code và chấp nhận cùng phiên bản để có thể cài đè bản đang thử; có thể chỉ định phiên bản khác bằng `-ProductVersion 1.0.1`. Đóng Inventor trước khi cài/cập nhật để tránh file DLL đang được nạp bị khóa. Gỡ cài đặt bằng **Installed apps** trong Windows.
+
+Manifest dùng `<LoadAutomatically>1</LoadAutomatically>` và `<LoadBehavior>1</LoadBehavior>` để Inventor tự nạp add-in khi mở tài liệu; `LoadBehavior=10` nghĩa là chỉ nạp theo yêu cầu trong Add-In Manager/API.
+
+Chạy kiểm tra cấu trúc và hậu xử lý DXF bằng lệnh:
+
+```powershell
+dotnet run --project .\Tests\DxfProcessorValidation\DxfProcessorValidation.csproj
+```
+
+Trong lệnh **Xuất BOM**, chọn file `.xlsx` mẫu, thư mục lưu và ánh xạ cột/dòng. Mặc định ghi lên worksheet đầu tiên, bắt đầu ở dòng 11. Các cột mặc định: STT (A), Tên chi tiết (C), Kích thước (E), Vật liệu (K), Số lượng (M). Kích thước lấy từ Flat Pattern. File mẫu không bị sửa, mỗi lần xuất tạo một file BOM mới; các ô metadata trong mẫu vẫn được giữ nguyên. Hình ảnh chưa xuất trong phiên bản này.
 
 ## Xem trước giao diện
 

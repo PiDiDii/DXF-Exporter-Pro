@@ -90,6 +90,24 @@ Builds used Inventor 2027 interop version `31.10.26700.0`. Neither project was l
 
 The public Autodesk Help links in the catalog were opened during the final link review. The third-party `inventor.autodeskapi.dev` reference still returned HTTP 402 and was not used as verification evidence. Direct network checks from the local shell were blocked by the environment; this is not evidence that an external link is broken.
 
+## Ribbon cleanup validation
+
+The retired Assembly/Part utility tabs are removed by exact internal name through `RibbonTabs.Count`, its 1-based `Item` indexer, and `RibbonTab.Delete`. These members were verified in the installed Inventor 2027 `Autodesk.Inventor.Interop.xml` topics `P:Inventor.RibbonTabs.Count`, `P:Inventor.RibbonTabs.Item`, and `M:Inventor.RibbonTab.Delete`, and the add-in compiled against interop version `31.10.26700.0`.
+
+| Validation | Command/check | Result |
+|---|---|---|
+| Main add-in build after UI refresh | `dotnet build E:\DXF Exporter Pro\InventorDxfExporter.csproj --no-restore` with isolated temporary intermediate/output paths and the existing workspace assets file | Succeeded; 0 warnings, 0 errors |
+| Ribbon tab cleanup runtime | Not run inside Inventor 2027 | Unverified; restart/reload the add-in in Inventor to confirm the persisted tab is removed |
+
+## Flat-pattern bounding-size display
+
+| API / topic | Inventor 2027 evidence | Result | Status |
+|---|---|---|---|
+| `FlatPattern.RangeBox`, `Box.MinPoint` / `MaxPoint`, `Point.X` / `Y` / `Z` | Autodesk Inventor 2027 API Help and installed `Autodesk.Inventor.Interop.xml` topics `P:Inventor.FlatPattern.RangeBox`, `P:Inventor.Box.MinPoint`, `P:Inventor.Box.MaxPoint`, and `P:Inventor.Point.X` / `Y` / `Z` | Read the existing flat-pattern bounding box without creating or changing a flat pattern; display the two largest of its three extents. | Verified from Inventor 2027 Reference |
+| `Document.UnitsOfMeasure`, `UnitsOfMeasure.ConvertUnits`, `UnitsTypeEnum.kDatabaseLengthUnits`, `UnitsTypeEnum.kMillimeterLengthUnits` | Autodesk Inventor 2027 API Help and installed interop XML topics `P:Inventor.Document.UnitsOfMeasure`, `M:Inventor.UnitsOfMeasure.ConvertUnits(System.Double,System.Object,System.Object)`, and the two enum fields | Convert database-unit X/Y extents to millimeters. The 2027 enum reference identifies database length units as centimeters. | Verified from Inventor 2027 Reference; Compile Verified |
+
+The export list reports “Chưa có Flat Pattern” when a part has no existing flat pattern. It does not call `Unfold` merely to populate the list. COM failures reading the bounding box appear in that row's tooltip.
+
 ## Evidence record template
 
 ```text

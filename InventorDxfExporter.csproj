@@ -13,6 +13,7 @@
   <ItemGroup>
     <Compile Remove="Preview\**\*.cs" />
     <Compile Remove="Skill\**\*.cs" />
+    <Compile Remove="Tests\DxfProcessorValidation\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.104.2" />

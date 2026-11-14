@@ -32,6 +32,7 @@ The interop metadata projects optional COM arguments as required C# parameters; 
 - Handle `UserInterfaceEvents.OnResetRibbonInterface` if the add-in needs to recreate UI after a user resets the Ribbon.
 - Use a unique stable internal name and the add-in client ID. Do not create duplicates on every activation.
 - Keep command enablement and active-document assumptions explicit. Test each supported ribbon/document context in Inventor.
+- When retiring a previously persisted custom tab, enumerate only the affected document-context ribbons and delete only exact add-in-owned internal names. Never remove a tab by its localized display name.
 
 ## Example
 

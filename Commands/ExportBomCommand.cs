@@ -10,7 +10,6 @@ namespace InventorDxfExporter.Commands;
 public sealed class ExportBomCommand
 {
     private readonly InventorApplication _application;
-    private readonly LegacyIniSettingsStore _settingsStore = new();
     private readonly ServiceContainer _services;
     public ExportBomCommand(InventorApplication application) { _application = application; _services = new ServiceContainer(application); }
 
@@ -22,23 +21,18 @@ public sealed class ExportBomCommand
             MessageBox.Show("Xuất BOM chỉ hỗ trợ Part hoặc Assembly.", "Xuất BOM", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-        var settings = _settingsStore.Load();
-        using var form = new BomForm(settings.OutputRoot);
+        var bomSettingsStore = new BomExportSettingsStore();
+        var bomSettings = bomSettingsStore.Load();
+        using var form = new BomForm(bomSettings, bomSettingsStore.Save);
         if (form.ShowDialog() != DialogResult.OK) return;
-        settings.OutputRoot = form.OutputDirectory;
-        if (string.IsNullOrWhiteSpace(settings.OutputRoot))
-        {
-            MessageBox.Show("Chưa chọn thư mục xuất BOM.", "Xuất BOM", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-        _settingsStore.Save(settings);
+        bomSettingsStore.Save(bomSettings);
         var items = _services.DxfExport.CollectItems(document);
         if (items.Count == 0)
         {
             MessageBox.Show("Không tìm thấy part Sheet Metal hợp lệ để lập BOM.", "Xuất BOM", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        string path = _services.Bom.Export(items, settings.OutputRoot);
+        string path = _services.Bom.Export(items, bomSettings);
         var summary = string.IsNullOrWhiteSpace(path) ? "Không xuất được BOM." : "Đã xuất BOM:\n" + path;
         if (_services.Bom.Errors.Count > 0) summary += "\n\nLỗi:\n" + string.Join("\n", _services.Bom.Errors);
         MessageBox.Show(summary, "Kết quả Xuất BOM", MessageBoxButtons.OK,

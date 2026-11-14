@@ -58,10 +58,18 @@ public sealed class ExportDxfCommand
             using var review = new PreflightReviewForm(preflight);
             if (review.ShowDialog() != DialogResult.OK) return;
         }
-
         IReadOnlyList<string> selectedPaths;
         using (var preview = new ExportPreviewForm(items, settings))
         {
+            preview.SettingsRequested += (_, _) =>
+            {
+                using var settingsForm = new ExportSettingsForm(settings);
+                if (settingsForm.ShowDialog(preview) != DialogResult.OK)
+                    return;
+
+                settingsForm.ApplyTo(settings);
+                _settingsStore.Save(settings);
+            };
             if (preview.ShowDialog() != DialogResult.OK) return;
             selectedPaths = preview.SelectedDocumentPaths;
         }

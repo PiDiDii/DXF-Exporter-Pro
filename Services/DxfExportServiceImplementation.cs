@@ -13,16 +13,6 @@ namespace InventorDxfExporter.Services;
 public sealed class DxfExportServiceImplementation : IDxfExportService
 {
     private const string DxfTranslatorId = "{C24E3AC4-122E-11D5-8E91-0010B541CD80}";
-    private static readonly (string Key, string Name)[] LayerMap =
-    {
-        ("OuterProfileLayer", "IV_OUTER_PROFILE"), ("InteriorProfilesLayer", "IV_INTERIOR_PROFILES"),
-        ("BendUpLayer", "IV_BEND_UP"), ("BendDownLayer", "IV_BEND_DOWN"),
-        ("ToolCenterLayer", "IV_TOOL_CENTER"), ("ArcCentersLayer", "IV_ARC_CENTERS"),
-        ("TangentLayer", "IV_TANGENT"), ("FeatureProfilesLayer", "IV_FEATURE_PROFILES"),
-        ("UnconsumedSketchesLayer", "IV_UNCONSUMED_SKETCHES"), ("TangentRollLinesLayer", "IV_ROLL_TANGENT"),
-        ("RollLinesLayer", "IV_ROLL")
-    };
-
     private readonly Inventor.Application? _application;
     private readonly IPartInfoService? _partInfo;
     private readonly IBomService? _bom;
@@ -100,26 +90,36 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
                             if (answer != System.Windows.Forms.DialogResult.Yes) { skippedExisting++; continue; }
                         }
                     }
-                    dxfTimer.Start();
-                    try { ExportOnePart(work.Document, path, BuildDxfOptions(settings)); }
-                    finally { dxfTimer.Stop(); }
-                    postTimer.Start();
+                    var temporaryDxfPath = path + ".tmp_" + Guid.NewGuid().ToString("N") + ".dxf";
                     try
                     {
-                        var options = new DxfProcessOptions(BuildDxfOptions(settings), settings.BendMode, settings.BendUpLen, settings.BendUpInset,
-                            settings.BendDownLen, settings.BendDownInset, settings.AddInfoText, settings.TextAlignment,
-                            settings.TextHeight, settings.TextLineGap, settings.TextYOffset);
-                        bendCount += _processor.Process(path, path, options, item).BendLinesProcessed;
+                        dxfTimer.Start();
+                        bool usedFallbackOptions;
+                        try { usedFallbackOptions = ExportOnePart(work.Document, temporaryDxfPath, settings, BuildDxfOptions(settings)); }
+                        finally { dxfTimer.Stop(); }
+                        postTimer.Start();
+                        try
+                        {
+                            var options = new DxfProcessOptions(BuildDxfOptions(settings), settings.BendMode, settings.BendUpLen, settings.BendUpInset,
+                                settings.BendDownLen, settings.BendDownInset, settings.AddInfoText, settings.TextAlignment,
+                                settings.TextHeight, settings.TextLineGap, settings.TextYOffset);
+                            bendCount += _processor.Process(temporaryDxfPath, path, options, item).BendLinesProcessed;
+                        }
+                        finally { postTimer.Stop(); }
+                        if (settings.UpdateInfoAndBom && _partInfo is not null)
+                        {
+                            infoTimer.Start();
+                            try { _partInfo.UpdateFromFlatPattern(work.Document, true); }
+                            catch (Exception ex) { errors.Add(item.DetailName + " (cập nhật Description/Thickness): " + ex.Message); }
+                            finally { infoTimer.Stop(); }
+                        }
+                        exported++;
+                        outputLines.AppendLine((usedFallbackOptions ? "OK (tùy chọn DXF tối giản): " : "OK: ") + path);
                     }
-                    finally { postTimer.Stop(); }
-                    if (settings.UpdateInfoAndBom && _partInfo is not null)
+                    finally
                     {
-                        infoTimer.Start();
-                        try { _partInfo.UpdateFromFlatPattern(work.Document, true); }
-                        catch (Exception ex) { errors.Add(item.DetailName + " (cập nhật Description/Thickness): " + ex.Message); }
-                        finally { infoTimer.Stop(); }
+                        if (IOFile.Exists(temporaryDxfPath)) IOFile.Delete(temporaryDxfPath);
                     }
-                    exported++; outputLines.AppendLine("OK: " + path);
                 }
                 catch (Exception ex) { errors.Add(item.DetailName + ": " + ex.Message); }
                 monitor.Report(new OperationProgress(index, items.Count, item.DetailName, "Đang xuất DXF"));
@@ -132,7 +132,8 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
                 bomTimer.Start();
                 try
                 {
-                    bomPath = _bom.Export(items.Values.Select(x => x.Item).ToArray(), settings.OutputRoot);
+                    var bomSettings = new InventorDxfExporter.Settings.BomExportSettingsStore().Load();
+                    bomPath = _bom.Export(items.Values.Select(x => x.Item).ToArray(), bomSettings);
                     if (_bom is BomServiceImplementation bomImpl) errors.AddRange(bomImpl.Errors);
                 }
                 catch (Exception ex) { errors.Add("Xuất BOM: " + ex.Message); }
@@ -165,7 +166,8 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
             if (skipped.Count > 0) { report.AppendLine("\nBỎ QUA:"); foreach (var line in skipped) report.AppendLine(line); }
             if (errors.Count > 0) { report.AppendLine("\nLỖI:"); foreach (var line in errors) report.AppendLine(line); }
             report.AppendLine(); report.Append(outputLines);
-            reportPath = IOPath.Combine(settings.OutputRoot, "BaoCao_Export_DXF.txt");
+            reportPath = IOPath.Combine(settings.OutputRoot,
+                "BaoCao_Export_DXF_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture) + ".txt");
             IOFile.WriteAllText(reportPath, report.ToString(), new UTF8Encoding(true));
             monitor.Report(new OperationProgress(items.Count, items.Count, reportPath, "Hoàn tất"));
             return new OperationResult(exported, skipped.Count + skippedExisting, errors.Count, reportPath,
@@ -247,9 +249,44 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
             if (items.TryGetValue(part.FullFileName, out var existing))
                 items[part.FullFileName] = existing with { Item = existing.Item with { Quantity = existing.Item.Quantity + quantity } };
             else
-                items.Add(part.FullFileName, new WorkItem(new ExportItem(part.FullFileName, IOPath.GetFileNameWithoutExtension(part.DisplayName), GetMaterial(part), GetThickness(sm), quantity), part));
+            {
+                var (xMm, yMm, sizeIssue) = GetFlatPatternSize(part, sm);
+                items.Add(part.FullFileName, new WorkItem(
+                    new ExportItem(part.FullFileName, IOPath.GetFileNameWithoutExtension(part.DisplayName),
+                        GetMaterial(part), GetThickness(sm), quantity, xMm, yMm, sizeIssue),
+                    part));
+            }
         }
         catch (Exception ex) { errors.Add(part.DisplayName + ": " + ex.Message); }
+    }
+
+    private static (double? Xmm, double? Ymm, string? Issue) GetFlatPatternSize(
+        PartDocument part,
+        SheetMetalComponentDefinition sheetMetal)
+    {
+        try
+        {
+            if (!sheetMetal.HasFlatPattern)
+                return (null, null, "Chưa có Flat Pattern");
+
+            var bounds = sheetMetal.FlatPattern.RangeBox;
+            var units = part.UnitsOfMeasure;
+            var x = units.ConvertUnits(Math.Abs(bounds.MaxPoint.X - bounds.MinPoint.X),
+                UnitsTypeEnum.kDatabaseLengthUnits, UnitsTypeEnum.kMillimeterLengthUnits);
+            var y = units.ConvertUnits(Math.Abs(bounds.MaxPoint.Y - bounds.MinPoint.Y),
+                UnitsTypeEnum.kDatabaseLengthUnits, UnitsTypeEnum.kMillimeterLengthUnits);
+            var z = units.ConvertUnits(Math.Abs(bounds.MaxPoint.Z - bounds.MinPoint.Z),
+                UnitsTypeEnum.kDatabaseLengthUnits, UnitsTypeEnum.kMillimeterLengthUnits);
+            var planarExtents = new[] { x, y, z }.OrderByDescending(extent => extent).Take(2).ToArray();
+            if (planarExtents.Any(extent => !double.IsFinite(extent) || extent <= 0))
+                return (null, null, "Kích thước Flat Pattern không hợp lệ");
+
+            return (planarExtents[0], planarExtents[1], null);
+        }
+        catch (System.Runtime.InteropServices.COMException ex)
+        {
+            return (null, null, "Không đọc được kích thước Flat Pattern: " + ex.Message);
+        }
     }
 
     private static string GetMaterial(PartDocument part)
@@ -262,12 +299,11 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
         catch { return "T_Khong_Xac_Dinh"; }
     }
 
-    private static void ExportOnePart(PartDocument part, string path, string options)
+    private bool ExportOnePart(PartDocument part, string path, ExportSettings settings, string options)
     {
         if (part.ComponentDefinition is not SheetMetalComponentDefinition sm) throw new InvalidOperationException("Không phải Sheet Metal.");
         if (!sm.HasFlatPattern) sm.Unfold();
         if (!sm.HasFlatPattern) throw new InvalidOperationException("Không tạo được Flat Pattern.");
-        DataIO dataIO; try { dataIO = sm.FlatPattern.DataIO; } catch { dataIO = sm.DataIO; }
         try
         {
             var app = part.Parent as Inventor.Application;
@@ -275,56 +311,34 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
         }
         catch { }
         var exportErrors = new List<Exception>();
-        try { dataIO.WriteDataToFile(options, path); return; }
-        catch (Exception ex) { exportErrors.Add(ex); }
+        if (TryWriteDxf(sm.DataIO, options, path, "SheetMetal.DataIO với tùy chọn hiện tại", exportErrors)) return false;
+        if (TryWriteDxf(sm.DataIO, BuildFallbackDxfOptions(settings), path, "SheetMetal.DataIO với tùy chọn DXF tối giản", exportErrors)) return true;
+        if (TryWriteDxf(sm.FlatPattern.DataIO, options, path, "FlatPattern.DataIO với tùy chọn hiện tại", exportErrors)) return false;
+        if (TryWriteDxf(sm.FlatPattern.DataIO, BuildFallbackDxfOptions(settings), path, "FlatPattern.DataIO với tùy chọn DXF tối giản", exportErrors)) return true;
+
+        throw new InvalidOperationException("Không thể xuất DXF hợp lệ bằng SheetMetal.DataIO hoặc FlatPattern.DataIO. " +
+            string.Join(" | ", exportErrors.Select(error => error.Message)), new AggregateException(exportErrors));
+    }
+
+    private bool TryWriteDxf(DataIO dataIO, string format, string path, string context, List<Exception> errors)
+    {
         try
         {
-            sm.FlatPattern.Edit();
-            dataIO = sm.DataIO;
-            dataIO.WriteDataToFile(options, path);
-            sm.FlatPattern.ExitEdit();
-            return;
+            dataIO.WriteDataToFile(format, path);
+            if (!_processor.Validate(path))
+                throw new InvalidDataException("DXF được tạo nhưng sai cấu trúc hoặc không có entity hợp lệ.");
+            return true;
         }
         catch (Exception ex)
         {
-            exportErrors.Add(ex);
-            try { sm.FlatPattern.ExitEdit(); }
-            catch (Exception exitError) { exportErrors.Add(exitError); }
-        }
-        try { sm.DataIO.WriteDataToFile(options, path); }
-        catch (Exception ex)
-        {
-            exportErrors.Add(ex);
-            throw new InvalidOperationException("DATAIO lỗi ở tất cả ngữ cảnh xuất DXF. " +
-                string.Join(" | ", exportErrors.Select(error => error.Message)), new AggregateException(exportErrors));
+            errors.Add(new InvalidOperationException(context + ": " + ex.Message, ex));
+            if (IOFile.Exists(path)) IOFile.Delete(path);
+            return false;
         }
     }
 
-    private static string BuildDxfOptions(ExportSettings settings)
-    {
-        var sb = new StringBuilder("FLAT PATTERN DXF?AcadVersion=2000"); var hidden = new List<string>();
-        for (int i = 0; i < LayerMap.Length; i++)
-        {
-            var (key, name) = LayerMap[i]; bool enabled = IsLayerEnabled(settings, name, i < 2);
-            if (!enabled) hidden.Add(name);
-            sb.Append('&').Append(key).Append('=').Append(name);
-            var style = settings.LayerStyles.TryGetValue(name, out var configuredStyle)
-                ? configuredStyle
-                : new LayerExportStyle();
-            if (!string.IsNullOrWhiteSpace(style.ColorRgb))
-                sb.Append('&').Append(key).Append("Color=").Append(style.ColorRgb);
-            sb.Append('&').Append(key).Append("LineType=").Append(style.LineType.ToString(CultureInfo.InvariantCulture));
-            sb.Append('&').Append(key).Append("LineWeight=")
-                .Append((style.LineWeightMm / 10.0).ToString("0.####", CultureInfo.InvariantCulture));
-        }
-        sb.Append("&InvisibleLayers=").Append(string.Join(";", hidden)).Append("&RebaseGeometry=True"); return sb.ToString();
-    }
-    private static bool IsLayerEnabled(ExportSettings settings, string name, bool defaultValue)
-    {
-        if (!settings.LayerSettings.TryGetValue(name, out var value)) return defaultValue;
-        var flag = value.Split('|')[0].Trim();
-        return flag.Equals("true", StringComparison.OrdinalIgnoreCase) || flag.Equals("hiện", StringComparison.OrdinalIgnoreCase) || flag.Equals("show", StringComparison.OrdinalIgnoreCase);
-    }
+    private static string BuildDxfOptions(ExportSettings settings) => DxfLayerOptionsBuilder.Build(settings, includeLineTypes: true);
+    private static string BuildFallbackDxfOptions(ExportSettings settings) => DxfLayerOptionsBuilder.Build(settings, includeLineTypes: false);
     private static string Seconds(Stopwatch timer) => (timer.ElapsedMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture);
     private sealed record WorkItem(ExportItem Item, PartDocument Document);
 }

@@ -73,7 +73,7 @@ public sealed class LegacyIniSettingsStore
         foreach (var layer in s.LayerStyles)
         {
             var style = layer.Value;
-            lines.Add($"LayerStyle.{layer.Key}={style.ColorRgb}|{style.LineType}|{Format(style.LineWeightMm)}");
+            lines.Add($"LayerStyle.{layer.Key}={style.LineType}|{Format(style.LineWeightMm)}");
         }
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         File.WriteAllLines(FilePath, lines, System.Text.Encoding.UTF8);
@@ -82,12 +82,14 @@ public sealed class LegacyIniSettingsStore
     private static bool TryParseLayerStyle(string value, out LayerExportStyle style)
     {
         var parts = value.Split('|');
-        if (parts.Length == 3
-            && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var lineType)
-            && double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var lineWeightMm)
+        var typeIndex = parts.Length == 3 ? 1 : 0;
+        var weightIndex = parts.Length - 1;
+        if (parts.Length is 2 or 3
+            && int.TryParse(parts[typeIndex], NumberStyles.Integer, CultureInfo.InvariantCulture, out var lineType)
+            && double.TryParse(parts[weightIndex], NumberStyles.Float, CultureInfo.InvariantCulture, out var lineWeightMm)
             && lineWeightMm > 0)
         {
-            style = new LayerExportStyle(parts[0], lineType, lineWeightMm);
+            style = new LayerExportStyle(lineType, lineWeightMm);
             return true;
         }
         style = new LayerExportStyle();

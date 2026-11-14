@@ -1,5 +1,5 @@
-using InventorDxfExporter.Core;
 using InventorDxfExporter.Services;
+using InventorDxfExporter.Core;
 using InventorDxfExporter.UI.Forms;
 
 namespace InventorDxfExporter.Preview;
@@ -26,8 +26,8 @@ internal sealed class PreviewDashboardForm : Form
             ("Cài đặt xuất DXF", () => ShowDialog(new ExportSettingsForm(CreateSettings(), previewMode: true))),
             ("Xuất DXF", () => ShowDialog(new DxfExportForm(CreateSettings()))),
             ("Convert STEP", () => ShowDialog(new ConvertStepForm(CreateSettings()))),
-            ("Xuất BOM", () => ShowDialog(new BomForm(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)))),
-            ("Danh sách xem trước DXF", () => ShowDialog(new ExportPreviewForm(items, settings))),
+            ("Xuất BOM", () => ShowDialog(new BomForm(new BomExportSettings(), _ => { }))),
+            ("Danh sách xem trước DXF", () => ShowExportPreview(items, settings)),
             ("Kiểm tra trước khi xuất", () => ShowDialog(new PreflightReviewForm(preflight))),
             ("Tiến trình thao tác", ShowProgressPreview)
         };
@@ -80,6 +80,18 @@ internal sealed class PreviewDashboardForm : Form
     private void ShowDialog(Form form)
     {
         using (form) form.ShowDialog(this);
+    }
+
+    private void ShowExportPreview(IReadOnlyList<ExportItem> items, ExportSettings settings)
+    {
+        using var preview = new ExportPreviewForm(items, settings);
+        preview.SettingsRequested += (_, _) =>
+        {
+            using var settingsForm = new ExportSettingsForm(settings);
+            if (settingsForm.ShowDialog(preview) == DialogResult.OK)
+                settingsForm.ApplyTo(settings);
+        };
+        preview.ShowDialog(this);
     }
 
     private void ShowProgressPreview()
@@ -138,9 +150,9 @@ internal sealed class PreviewDashboardForm : Form
 
     private static IReadOnlyList<ExportItem> CreateItems() =>
     [
-        new(@"C:\Preview\Khung trai.ipt", "Khung trái", "SS400", "2.0", 2),
-        new(@"C:\Preview\Nap tren.ipt", "Nắp trên", "SUS304", "1.5", 1),
-        new(@"C:\Preview\Tai ga.ipt", "Tai gá", "SS400", "3.0", 4)
+        new(@"C:\Preview\Khung trai.ipt", "Khung trái", "SS400", "T2.0", 2, 1112.3, 800),
+        new(@"C:\Preview\Nap tren.ipt", "Nắp trên", "SUS304", "T1.5", 1, 248.5, 50),
+        new(@"C:\Preview\Tai ga.ipt", "Tai gá", "SS400", "T3.0", 4, 597, 115.7)
     ];
 
     private static ExportPreflightResult CreatePreflightResult() =>

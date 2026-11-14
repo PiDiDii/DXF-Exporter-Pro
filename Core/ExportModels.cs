@@ -32,11 +32,19 @@ public sealed class ExportSettings
     public Dictionary<string, LayerExportStyle> LayerStyles { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
-public sealed record LayerExportStyle(string ColorRgb = "", int LineType = 37648, double LineWeightMm = 0.5);
+public sealed record LayerExportStyle(int LineType = 37648, double LineWeightMm = 0.5);
 
 public sealed record LayerRow(string Name, bool Enabled);
 
 /// <summary>Document identity is a file path; Inventor COM objects stay within service adapters.</summary>
-public sealed record ExportItem(string DocumentPath, string DetailName, string Material, string Thickness, int Quantity);
+public sealed record ExportItem(
+    string DocumentPath,
+    string DetailName,
+    string Material,
+    string Thickness,
+    int Quantity,
+    double? FlatPatternXmm = null,
+    double? FlatPatternYmm = null,
+    string? FlatPatternSizeIssue = null);
 
 public sealed record OperationResult(int Success, int Skipped, int Errors, string LogFile, IReadOnlyList<string> Messages);

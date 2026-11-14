@@ -51,3 +51,9 @@ E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\refint\ExportSettingsPrevi
 E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.pdb
 E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ExportSettingsPreview.genruntimeconfig.cache
 E:\DXF Exporter Pro\Preview\obj\Debug\net10.0-windows\ref\ExportSettingsPreview.dll
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\InventorDxfExporter.addin
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\ExportSettingsPreview.exe
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\ExportSettingsPreview.deps.json
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\ExportSettingsPreview.runtimeconfig.json
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\ExportSettingsPreview.dll
+C:\Users\ptqn9\AppData\Local\Temp\DXFExporter-preview-status-check-bin\ExportSettingsPreview.pdb
