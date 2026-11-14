@@ -15,7 +15,7 @@ public sealed class ServiceContainer
     {
         ArgumentNullException.ThrowIfNull(application);
         PartInfo = new PartInfoServiceImplementation();
-        Bom = new BomServiceImplementation();
+        Bom = new BomServiceImplementation(application);
         DxfExport = new DxfExportServiceImplementation(application, PartInfo, Bom);
         Convert = new ConvertServiceImplementation(application);
     }

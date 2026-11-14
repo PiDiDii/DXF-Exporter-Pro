@@ -1,4 +1,5 @@
 using Inventor;
+using InventorDxfExporter.Core;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -223,12 +224,6 @@ public sealed class RibbonCommandSet
     private sealed record ButtonLayout(ButtonDefinition Definition);
     private sealed record IconPair(System.Drawing.Bitmap StandardBitmap, System.Drawing.Bitmap LargeBitmap, object StandardPicture, object LargePicture);
 
-    private sealed class PictureDispBridge : AxHost
-    {
-        private PictureDispBridge() : base(string.Empty) { }
-        public static object FromImage(System.Drawing.Image image) =>
-            GetIPictureDispFromPicture(image) ?? throw new InvalidOperationException("Không thể chuyển ảnh thành biểu tượng Ribbon.");
-    }
 }
 
 internal static class GraphicsRoundedRectangleExtensions

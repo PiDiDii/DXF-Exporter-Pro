@@ -1,0 +1,120 @@
+﻿' Export Images - Tuấn Anh Edu style
+Sub Main
+    ' Kiểm tra loại document
+    If ThisApplication.ActiveDocumentType <> DocumentTypeEnum.kAssemblyDocumentObject Then
+        MessageBox.Show("Rule này chỉ hoạt động với Assembly Files." & vbLf & _
+            "Vui lòng mở file Assembly trước khi chạy.", _
+            "SAI LOẠI FILE", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Return
+    End If
+
+    Dim oAsmDoc As AssemblyDocument = ThisApplication.ActiveDocument
+
+    ' Xác nhận với người dùng
+    Dim RUsure = MessageBox.Show( _
+        "Rule này sẽ xuất ảnh cho TẤT CẢ các part trong assembly." & vbLf & vbLf & _
+        "Bạn có chắc chắn muốn tiếp tục?" & vbLf & _
+        "Quá trình này có thể mất vài phút tùy số lượng part.", _
+        "iLogic - Batch Export Image", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+    If RUsure = vbNo Then Return
+
+    Dim iProp As String = "Part Number"
+    Dim iExt As String = ".jpg" ' Có thể đổi thành .png, .bmp, .tif...
+
+    ' Kiểm tra file assembly đã lưu chưa
+    If oAsmDoc.FullFileName = "" Then
+        MessageBox.Show("File Assembly chưa được lưu. Hãy lưu lại trước khi chạy rule.", _
+            "iLogic", MessageBoxButtons.OK, MessageBoxIcon.Exclamation)
+        Return
+    End If
+
+    ' Tạo thư mục đầu ra
+    Dim oPath As String = IO.Path.GetDirectoryName(oAsmDoc.FullFileName)
+    Dim oFolder As String = oPath & "\ExportedImages"
+
+    ' Xóa thư mục cũ nếu tồn tại
+    If IO.Directory.Exists(oFolder) Then
+        Try
+            IO.Directory.Delete(oFolder, True)
+        Catch ex As Exception
+            MessageBox.Show("Không thể xóa thư mục cũ: " & oFolder, "LỖI", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End Try
+    End If
+    IO.Directory.CreateDirectory(oFolder)
+
+    ' Lấy danh sách tất cả referenced documents (chỉ Part)
+    Dim oRefDocs As DocumentsEnumerator = oAsmDoc.AllReferencedDocuments
+
+    Dim successCount As Integer = 0
+    Dim errorCount As Integer = 0
+    Dim errorList As String = ""
+
+    For Each oRefDoc As Document In oRefDocs
+        ' Chỉ xử lý Part Documents
+        If oRefDoc.DocumentType <> DocumentTypeEnum.kPartDocumentObject Then Continue For
+
+        Try
+            ' Mở file part (chế độ không hiển thị)
+            Dim oCurFile As PartDocument = ThisApplication.Documents.Open(oRefDoc.FullFileName, False)
+
+            ' Lấy Part Number
+            Dim partNumber As String = ""
+            Try
+                partNumber = oCurFile.PropertySets.Item("Design Tracking Properties").Item(iProp).Value
+            Catch
+                partNumber = IO.Path.GetFileNameWithoutExtension(oCurFile.FullFileName)
+            End Try
+
+            ' Lấy Revision
+            Dim revision As String = ""
+            Try
+                revision = oCurFile.PropertySets.Item("Inventor Summary Information").Item("Revision Number").Value
+            Catch
+                revision = ""
+            End Try
+
+            ' Tạo tên file, loại bỏ ký tự không hợp lệ
+            Dim fileName As String = partNumber & revision & "-1" & iExt
+            Dim invalidChars As String = New String(IO.Path.GetInvalidFileNameChars())
+            For Each c As Char In invalidChars
+                fileName = fileName.Replace(c, "_")
+            Next
+
+            Dim fullPath As String = IO.Path.Combine(oFolder, fileName)
+
+            ' Xuất ảnh
+            oCurFile.SaveAs(fullPath, True)
+
+            successCount += 1
+            oCurFile.Close(True)
+
+        Catch ex As Exception
+            errorCount += 1
+            errorList = errorList & "- " & oRefDoc.DisplayName & " (" & ex.Message & ")" & vbLf
+        End Try
+    Next
+
+    ' Thông báo kết quả
+    Dim resultMsg As String = "HOÀN TẤT XUẤT ẢNH" & vbLf & vbLf & _
+        "Thành công: " & successCount & " file(s)" & vbLf & _
+        "Lỗi: " & errorCount & " file(s)" & vbLf & vbLf & _
+        "Thư mục: " & vbLf & oFolder
+
+    If errorCount > 0 Then
+        resultMsg = resultMsg & vbLf & vbLf & "Các file lỗi:" & vbLf & errorList
+    End If
+
+    MessageBox.Show(resultMsg, "iLogic - Export Image", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+    ' Mở thư mục chứa ảnh
+    If successCount > 0 Then
+        Dim openFolder = MessageBox.Show("Bạn có muốn mở thư mục ExportedImages?", _
+            "iLogic", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+        If openFolder = vbYes Then
+            System.Diagnostics.Process.Start(oFolder)
+        End If
+    End If
+End Sub

@@ -2,6 +2,7 @@ namespace InventorDxfExporter.Core;
 
 public sealed class BomExportSettings
 {
+    public int SchemaVersion { get; set; }
     public string TemplatePath { get; set; } = string.Empty;
     public string OutputDirectory { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
     public int StartRow { get; set; } = 11;
@@ -11,7 +12,7 @@ public sealed class BomExportSettings
     [
         new("STT", true, "A"),
         new("Tên chi tiết", true, "C"),
-        new("Hình ảnh", false, "D"),
+        new("Hình ảnh", true, "D"),
         new("Kích thước", true, "E"),
         new("Vật liệu", true, "K"),
         new("Số lượng", true, "M")
@@ -39,4 +40,5 @@ public sealed record BomTemplateRow(
     string DetailName,
     string Dimensions,
     string Material,
-    int Quantity);
+    int Quantity,
+    byte[]? ImageData = null);

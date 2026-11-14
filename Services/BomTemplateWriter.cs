@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using ClosedXML.Excel.Drawings;
 using InventorDxfExporter.Core;
 using IOPath = System.IO.Path;
 
@@ -35,6 +36,23 @@ public static class BomTemplateWriter
                 {
                     case "STT": cell.Value = row.Number; break;
                     case "TÊN CHI TIẾT": cell.Value = row.DetailName; break;
+                    case "HÌNH ẢNH":
+                        if (row.ImageData is { Length: > 0 } imageData)
+                        {
+                            var columnNumber = cell.Address.ColumnNumber;
+                            worksheet.Column(columnNumber).Width = Math.Max(worksheet.Column(columnNumber).Width, 14);
+                            worksheet.Row(rowNumber).Height = Math.Max(worksheet.Row(rowNumber).Height, 50);
+                            using var imageStream = new MemoryStream(imageData, writable: false);
+                            using var image = System.Drawing.Image.FromStream(imageStream);
+                            var scale = Math.Min(90d / image.Width, 60d / image.Height);
+                            var imageWidth = Math.Max(1, (int)Math.Round(image.Width * scale));
+                            var imageHeight = Math.Max(1, (int)Math.Round(image.Height * scale));
+                            imageStream.Position = 0;
+                            worksheet.AddPicture(imageStream, XLPictureFormat.Png)
+                                .MoveTo(cell, 3, 3)
+                                .WithSize(imageWidth, imageHeight);
+                        }
+                        break;
                     case "KÍCH THƯỚC": cell.Value = row.Dimensions; break;
                     case "VẬT LIỆU": cell.Value = row.Material; break;
                     case "SỐ LƯỢNG": cell.Value = row.Quantity; break;
@@ -77,13 +95,9 @@ public static class BomTemplateWriter
 
         var enabledColumns = settings.Columns.Where(column => column.Enabled).ToArray();
         foreach (var mapping in enabledColumns)
-        {
-            if (mapping.Field.Equals("Hình ảnh", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Xuất ảnh sẽ được bổ sung ở phiên bản sau.");
             _ = ColumnNumber(mapping.Column);
-        }
         var supportedFields = new HashSet<string>(
-            ["STT", "Tên chi tiết", "Kích thước", "Vật liệu", "Số lượng"],
+            ["STT", "Tên chi tiết", "Hình ảnh", "Kích thước", "Vật liệu", "Số lượng"],
             StringComparer.OrdinalIgnoreCase);
         var unsupported = enabledColumns.FirstOrDefault(mapping => !supportedFields.Contains(mapping.Field));
         if (unsupported is not null)

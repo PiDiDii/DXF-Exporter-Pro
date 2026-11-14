@@ -13,5 +13,6 @@
     <Compile Include="..\..\Core\DxfLayerOptionsBuilder.cs" Link="DxfLayerOptionsBuilder.cs" />
     <Compile Include="..\..\Core\BomExportSettings.cs" Link="BomExportSettings.cs" />
     <Compile Include="..\..\Services\BomTemplateWriter.cs" Link="BomTemplateWriter.cs" />
+    <Compile Include="..\..\Settings\BomExportSettingsStore.cs" Link="BomExportSettingsStore.cs" />
   </ItemGroup>
 </Project>

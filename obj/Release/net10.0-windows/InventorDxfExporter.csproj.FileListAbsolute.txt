@@ -117,3 +117,7 @@ C:\Users\ptqn9\AppData\Local\Temp\InventorDxfExporter-Msi-f03e347b932d444ab58138
 C:\Users\ptqn9\AppData\Local\Temp\InventorDxfExporter-Msi-f03e347b932d444ab58138341c00ae11\payload\InventorDxfExporter.deps.json
 C:\Users\ptqn9\AppData\Local\Temp\InventorDxfExporter-Msi-f03e347b932d444ab58138341c00ae11\payload\InventorDxfExporter.dll
 C:\Users\ptqn9\AppData\Local\Temp\InventorDxfExporter-Msi-f03e347b932d444ab58138341c00ae11\payload\InventorDxfExporter.pdb
+C:\Users\ptqn9\AppData\Local\Temp\InventorDxfExporter-Msi-82c4e39d5d1b47ae8f29456797f605b2\payload\InventorDxfExporter.addin
+C:\Users\ptqn9\AppData\Local\Temp\InventorDxfExporter-Msi-82c4e39d5d1b47ae8f29456797f605b2\payload\InventorDxfExporter.deps.json
+C:\Users\ptqn9\AppData\Local\Temp\InventorDxfExporter-Msi-82c4e39d5d1b47ae8f29456797f605b2\payload\InventorDxfExporter.dll
+C:\Users\ptqn9\AppData\Local\Temp\InventorDxfExporter-Msi-82c4e39d5d1b47ae8f29456797f605b2\payload\InventorDxfExporter.pdb

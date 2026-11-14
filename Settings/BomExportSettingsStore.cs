@@ -5,21 +5,37 @@ namespace InventorDxfExporter.Settings;
 
 public sealed class BomExportSettingsStore
 {
+    private const int CurrentSchemaVersion = 1;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public string FilePath { get; } = Path.Combine(
+    public string FilePath { get; }
+
+    public BomExportSettingsStore() : this(Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "Inventor_DXF_Exporter",
-        "BomExportSettings.json");
+        "BomExportSettings.json"))
+    {
+    }
+
+    internal BomExportSettingsStore(string filePath)
+    {
+        FilePath = Path.GetFullPath(filePath);
+    }
 
     public BomExportSettings Load()
     {
         if (!File.Exists(FilePath))
-            return new BomExportSettings();
+            return new BomExportSettings { SchemaVersion = CurrentSchemaVersion };
 
         var settings = JsonSerializer.Deserialize<BomExportSettings>(File.ReadAllText(FilePath), JsonOptions)
             ?? throw new InvalidDataException($"Không đọc được cấu hình BOM: {FilePath}");
         MergeDefaultColumns(settings);
+        if (settings.SchemaVersion < CurrentSchemaVersion)
+        {
+            settings.Columns.First(column =>
+                column.Field.Equals("Hình ảnh", StringComparison.OrdinalIgnoreCase)).Enabled = true;
+            settings.SchemaVersion = CurrentSchemaVersion;
+        }
         return settings;
     }
 
@@ -27,6 +43,7 @@ public sealed class BomExportSettingsStore
     {
         ArgumentNullException.ThrowIfNull(settings);
         MergeDefaultColumns(settings);
+        settings.SchemaVersion = CurrentSchemaVersion;
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, JsonOptions));
     }

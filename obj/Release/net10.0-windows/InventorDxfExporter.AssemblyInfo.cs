@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("InventorDxfExporter")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7e04332d47671629da80f4066d038fd16bacf7e0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+336b6b7ee7115cdade0ef1aca36f14a1ea2ccc1b")]
 [assembly: System.Reflection.AssemblyProductAttribute("InventorDxfExporter")]
 [assembly: System.Reflection.AssemblyTitleAttribute("InventorDxfExporter")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

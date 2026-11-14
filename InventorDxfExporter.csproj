@@ -22,6 +22,11 @@
       <EmbedInteropTypes>false</EmbedInteropTypes>
       <Private>false</Private>
     </Reference>
+    <Reference Include="stdole">
+      <HintPath>$(InventorBinPath)\stdole.dll</HintPath>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+      <Private>false</Private>
+    </Reference>
     <None Update="InventorDxfExporter.addin" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

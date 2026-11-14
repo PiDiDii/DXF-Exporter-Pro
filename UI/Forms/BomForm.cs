@@ -24,7 +24,7 @@ public sealed class BomForm : Form
         FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox = false;
         MaximizeBox = true;
-        MinimumSize = new System.Drawing.Size(420, 590);
+        MinimumSize = new System.Drawing.Size(620, 550);
         ClientSize = new System.Drawing.Size(404, 600);
 
         LoadValues();
@@ -184,13 +184,6 @@ public sealed class BomForm : Form
             fieldLabel.Dock = DockStyle.Fill;
             fieldLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             fieldLabel.Margin = Padding.Empty;
-            if (defaultMapping.Field.Equals("Hình ảnh", StringComparison.OrdinalIgnoreCase))
-            {
-                enabled.Checked = false;
-                enabled.Enabled = false;
-                fieldLabel.Text += " (sẽ bổ sung sau)";
-                column.Enabled = false;
-            }
             _mappings[defaultMapping.Field] = (enabled, column);
             grid.Controls.Add(enabled, 0, rowIndex);
             grid.Controls.Add(fieldLabel, 1, rowIndex);

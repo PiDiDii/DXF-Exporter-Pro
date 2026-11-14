@@ -1,5 +1,6 @@
 using InventorDxfExporter.Core;
 using InventorDxfExporter.Services;
+using InventorDxfExporter.Settings;
 using ClosedXML.Excel;
 
 var valid = new[]
@@ -81,9 +82,22 @@ try
         OutputDirectory = outputDirectory,
         StartRow = 11
     };
+    var settingsPath = Path.Combine(tempDirectory, "bom-settings.json");
+    File.WriteAllText(settingsPath,
+        "{\"TemplatePath\":\"template.xlsx\",\"OutputDirectory\":\"\",\"StartRow\":11,\"Columns\":[{\"Field\":\"Hình ảnh\",\"Enabled\":false,\"Column\":\"D\"}]}");
+    var settingsStore = new BomExportSettingsStore(settingsPath);
+    var migratedSettings = settingsStore.Load();
+    Require(migratedSettings.Columns.First(mapping => mapping.Field == "Hình ảnh").Enabled,
+        "An existing BOM configuration was not migrated to enable image export.");
+    settingsStore.Save(migratedSettings);
+    migratedSettings.Columns.First(mapping => mapping.Field == "Hình ảnh").Enabled = false;
+    settingsStore.Save(migratedSettings);
+    Require(!settingsStore.Load().Columns.First(mapping => mapping.Field == "Hình ảnh").Enabled,
+        "A user's choice to disable image export was not preserved.");
+
     var bomOutput = BomTemplateWriter.Write(
         bomSettings,
-        [new BomTemplateRow(1, "Bracket", "100 x 50 mm", "SS400", 3)],
+        [new BomTemplateRow(1, "Bracket", "100 x 50 mm", "SS400", 3, CreateTestImage())],
         new DateTime(2026, 11, 13));
     Require(File.Exists(bomOutput), "BOM template output was not created.");
     using (var result = new XLWorkbook(bomOutput))
@@ -97,6 +111,8 @@ try
         Require(firstSheet.Cell("E11").GetString() == "100 x 50 mm", "Dimensions were not written.");
         Require(firstSheet.Cell("K11").GetString() == "SS400", "Material was not written to its configured column.");
         Require(firstSheet.Cell("M11").GetValue<int>() == 3, "Quantity was not written.");
+        Require(firstSheet.Pictures.Count == 1, "The BOM image was not embedded in the workbook.");
+        Require(firstSheet.Row(11).Height >= 50, "The image row was not enlarged to display the image.");
         Require(firstSheet.Cell("Z11").GetString() == "untouched", "Unmapped template cells should remain untouched.");
         Require(result.Worksheets.Count == 2 && result.Worksheet(2).Cell("A1").GetString() == "untouched sheet",
             "The template's other worksheets should remain untouched.");
@@ -128,4 +144,12 @@ Console.WriteLine("DXF structure and BOM template validation checks passed.");
 static void Require(bool condition, string message)
 {
     if (!condition) throw new InvalidOperationException(message);
+}
+
+static byte[] CreateTestImage()
+{
+    using var image = new System.Drawing.Bitmap(2, 2);
+    using var stream = new MemoryStream();
+    image.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+    return stream.ToArray();
 }

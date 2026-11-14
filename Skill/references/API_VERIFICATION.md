@@ -108,6 +108,19 @@ The retired Assembly/Part utility tabs are removed by exact internal name throug
 
 The export list reports “Chưa có Flat Pattern” when a part has no existing flat pattern. It does not call `Unfold` merely to populate the list. COM failures reading the bounding box appear in that row's tooltip.
 
+## BOM document-thumbnail export
+
+| API / topic | Inventor 2027 evidence | Result | Status |
+|---|---|---|---|
+| `Document.Thumbnail` | Autodesk Inventor 2027 API Help, [`Document.Thumbnail`](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-API/files/Document_Thumbnail.htm), and installed `Autodesk.Inventor.Interop.xml` topic `P:Inventor.Document.Thumbnail`; the installed interop projects the property as `stdole.IPictureDisp` | Reads the saved document preview in the in-process add-in; it is not a fresh render of the current view. `stdole.dll` from the Inventor 2027 Bin is referenced for the COM type. | Verified from Inventor 2027 Reference; Compile Verified |
+| `Documents.Open` and `Document.Close` | Autodesk Inventor 2027 API Help and installed interop XML topics `M:Inventor.Documents.Open(System.String,System.Boolean)` and `M:Inventor.Document.Close(System.Boolean)` | Opens only parts not already open, with `OpenVisible = false`; closes only parts opened for this export, using `SkipSave = true`. | Verified from Inventor 2027 Reference; Compile Verified |
+
+| Validation | Command/check | Result |
+|---|---|---|
+| Add-in build | `dotnet build .\InventorDxfExporter.csproj --no-restore` | Succeeded; 0 warnings, 0 errors |
+| BOM/DXF validation | `dotnet run --project .\Tests\DxfProcessorValidation\DxfProcessorValidation.csproj` | Passed, including workbook picture embedding and migration of legacy image settings |
+| Inventor runtime | Not run inside Inventor 2027 | Unverified; confirm thumbnail availability and appearance in the host, especially for unsaved or thumbnail-less parts |
+
 ## Evidence record template
 
 ```text
