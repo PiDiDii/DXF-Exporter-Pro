@@ -7,15 +7,6 @@ namespace InventorDxfExporter.UI.Forms;
 
 public sealed class ExportSettingsForm : Form
 {
-    private static readonly (string Name, string Description, bool Default)[] Layers =
-    {
-        ("IV_OUTER_PROFILE", "Đường bao ngoài", true), ("IV_INTERIOR_PROFILES", "Đường bao trong / lỗ", true),
-        ("IV_BEND_UP", "Đường gấp lên (bend up)", false), ("IV_BEND_DOWN", "Đường gấp xuống (bend down)", false),
-        ("IV_TOOL_CENTER", "Tâm dụng cụ (tool center)", false), ("IV_ARC_CENTERS", "Tâm cung tròn", false),
-        ("IV_TANGENT", "Đường tiếp tuyến", false), ("IV_FEATURE_PROFILES", "Đường bao chi tiết đặc trưng", false),
-        ("IV_UNCONSUMED_SKETCHES", "Sketch chưa dùng đến", false), ("IV_ROLL_TANGENT", "Tiếp tuyến đường cán", false),
-        ("IV_ROLL", "Đường cán (roll line)", false)
-    };
     private readonly ExportSettings _settings;
     private readonly SettingsProfileStore _profiles = new();
     private readonly DataGridView _layers = new() { Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
@@ -33,15 +24,16 @@ public sealed class ExportSettingsForm : Form
 
     public ExportSettingsForm(ExportSettings settings, bool previewMode = false)
     {
-        _settings = settings;
+        ArgumentNullException.ThrowIfNull(settings);
+        _settings = CreateWorkingCopy(settings);
         UiStyles.Initialize(this);
         Text = previewMode ? "Xem trước cài đặt xuất DXF" : "Cài đặt xuất DXF";
         StartPosition = previewMode ? FormStartPosition.CenterScreen : FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox = false;
         MaximizeBox = true;
-        MinimumSize = new System.Drawing.Size(900, 750);
-        ClientSize = new System.Drawing.Size(900, 750);
+        MinimumSize = new System.Drawing.Size(900, 660);
+        ClientSize = new System.Drawing.Size(1000, 700);
         _layers.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Enabled", HeaderText = "Xuất", FillWeight = 35 });
         _layers.Columns.Add("Name", "Tên layer");
         _layers.Columns.Add("Description", "Mô tả");
@@ -60,7 +52,7 @@ public sealed class ExportSettingsForm : Form
         _layers.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
         _bend.Items.AddRange(new object[] { "Giữ nguyên đường dài", "Chỉ đánh dấu 2 đầu" });
         _alignment.Items.AddRange(new object[] { "Căn trái", "Căn giữa" });
-        Populate(settings);
+        Populate(_settings);
 
         var tabs = new TabControl { Dock = DockStyle.Fill, Padding = new System.Drawing.Point(14, 6), Margin = new Padding(18, 4, 18, 10) };
         var layersPage = new TabPage("Layer DXF") { BackColor = UiStyles.Canvas, Padding = new Padding(12) };
@@ -117,8 +109,8 @@ public sealed class ExportSettingsForm : Form
 
     public void ApplyTo(ExportSettings settings)
     {
+        ArgumentNullException.ThrowIfNull(settings);
         if (!ValidateNumberInputs()) throw new InvalidOperationException("Vui lòng nhập các giá trị số hợp lệ.");
-        settings.FilePattern = ExportSettings.DefaultFilePattern;
         settings.BendMode = _bend.Text; settings.AddInfoText = _text.Checked;
         settings.TextAlignment = _alignment.Text;
         if (_text.Checked)
@@ -131,21 +123,21 @@ public sealed class ExportSettingsForm : Form
         foreach (DataGridViewRow row in _layers.Rows)
         {
             var name = Convert.ToString(row.Cells[1].Value, CultureInfo.InvariantCulture) ?? "";
-            settings.LayerSettings[name] = Convert.ToBoolean(row.Cells[0].Value ?? false) ? "True" : "False";
+            settings.LayerSettings[name] = Convert.ToBoolean(row.Cells[0].Value ?? false).ToString();
         }
     }
 
     private Control BuildProfiles(bool previewMode)
     {
-        var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0, 4, 0, 0) };
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0, 4, 0, 0) };
         bar.Controls.Add(new Label { Text = "Cấu hình dự án:", AutoSize = true, Margin = new Padding(0, 4, 8, 0) });
         if (!previewMode) RefreshProfiles();
         _profileList.Margin = new Padding(0, 0, 8, 0);
         _profileList.DropDown += (_, _) => RefreshProfiles();
         bar.Controls.Add(_profileList);
-        bar.Controls.Add(new Button { Text = "Nạp", AutoSize = true, Margin = new Padding(0, 0, 12, 0) }.Also(b => b.Click += (_, _) => LoadProfile()));
-        bar.Controls.Add(new Button { Text = "Lưu mẫu", AutoSize = true, Margin = new Padding(0, 0, 8, 0) }.Also(b => b.Click += (_, _) => SaveProfile()));
-        bar.Controls.Add(new Button { Text = "Xóa mẫu", AutoSize = true }.Also(b => b.Click += (_, _) => DeleteProfile()));
+        bar.Controls.Add(UiStyles.CreateButton("Nạp").Also(b => b.Margin = new Padding(0, 0, 12, 0)).Also(b => b.Click += (_, _) => LoadProfile()));
+        bar.Controls.Add(UiStyles.CreateButton("Lưu mẫu").Also(b => b.Margin = new Padding(0, 0, 8, 0)).Also(b => b.Click += (_, _) => SaveProfile()));
+        bar.Controls.Add(UiStyles.CreateButton("Xóa mẫu").Also(b => b.Margin = new Padding(0, 0, 8, 0)).Also(b => b.Click += (_, _) => DeleteProfile()));
         bar.Enabled = !previewMode;
         return bar;
     }
@@ -154,9 +146,9 @@ public sealed class ExportSettingsForm : Form
     {
         var group = new GroupBox { Text = "Layer DXF", Dock = DockStyle.Fill };
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 38, Padding = new Padding(4, 2, 4, 2), WrapContents = false };
-        buttons.Controls.Add(new Button { Text = "Chọn tất cả", AutoSize = true, Margin = new Padding(0, 0, 8, 0) }.Also(b => b.Click += (_, _) => SetLayers(true)));
-        buttons.Controls.Add(new Button { Text = "Bỏ chọn tất cả", AutoSize = true, Margin = new Padding(0, 0, 8, 0) }.Also(b => b.Click += (_, _) => SetLayers(false)));
-        buttons.Controls.Add(new Button { Text = "Mặc định Outer + Interior", AutoSize = true }.Also(b => b.Click += (_, _) => SetDefaultLayers()));
+        buttons.Controls.Add(UiStyles.CreateButton("Chọn tất cả").Also(b => b.Margin = new Padding(0, 0, 8, 0)).Also(b => b.Click += (_, _) => SetLayers(true)));
+        buttons.Controls.Add(UiStyles.CreateButton("Bỏ chọn tất cả").Also(b => b.Margin = new Padding(0, 0, 8, 0)).Also(b => b.Click += (_, _) => SetLayers(false)));
+        buttons.Controls.Add(UiStyles.CreateButton("Mặc định Outer + Interior").Also(b => b.Margin = new Padding(0, 0, 8, 0)).Also(b => b.Click += (_, _) => SetDefaultLayers()));
         _layers.Dock = DockStyle.Fill;
         group.Controls.Add(_layers); group.Controls.Add(buttons); return group;
     }
@@ -170,7 +162,7 @@ public sealed class ExportSettingsForm : Form
 
         var bendSettings = CreateBendSettingsColumn();
 
-        var textSettings = CreateSettingsColumn(5, 136, 42);
+        var textSettings = CreateSettingsColumn(5, 118, 42);
         _text.Anchor = AnchorStyles.Left;
         _text.Margin = Padding.Empty;
         textSettings.Controls.Add(_text, 0, 0);
@@ -200,7 +192,7 @@ public sealed class ExportSettingsForm : Form
             Margin = new Padding(0, 0, 12, 0)
         };
         column.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, labelWidth));
-        column.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220));
+        column.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (var index = 0; index < rows; index++)
             column.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
         return column;
@@ -219,9 +211,9 @@ public sealed class ExportSettingsForm : Form
             Padding = Padding.Empty,
             Margin = new Padding(0, 0, 12, 0)
         };
-        column.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 164));
-        column.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92));
-        column.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92));
+        column.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 146));
+        column.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 82));
+        column.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 82));
         for (var index = 0; index < column.RowCount; index++)
             column.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
 
@@ -273,17 +265,17 @@ public sealed class ExportSettingsForm : Form
 
     private void Populate(ExportSettings s)
     {
-        s.FilePattern = ExportSettings.DefaultFilePattern;
         _bend.SelectedItem = s.BendMode; if (_bend.SelectedIndex < 0) _bend.SelectedIndex = 0;
         _text.Checked = s.AddInfoText; _alignment.SelectedItem = s.TextAlignment; if (_alignment.SelectedIndex < 0) _alignment.SelectedIndex = 1;
         SetNumber(_height, s.TextHeight, 0.1M, 500M, 1); SetNumber(_gap, s.TextLineGap, 0.1M, 500M, 1); SetNumber(_yOffset, s.TextYOffset, -10000M, 10000M, 1);
         SetNumber(_upLen, s.BendUpLen, 0M, 1000M, 2); SetNumber(_upInset, s.BendUpInset, 0M, 1000M, 2);
         SetNumber(_downLen, s.BendDownLen, 0M, 1000M, 2); SetNumber(_downInset, s.BendDownInset, 0M, 1000M, 2);
         _layers.Rows.Clear();
-        foreach (var layer in Layers)
+        foreach (var layer in DxfLayerOptionsBuilder.LayerOptions)
         {
-            bool enabled = layer.Default;
-            if (s.LayerSettings.TryGetValue(layer.Name, out var stored)) enabled = stored.Split('|')[0].Equals("true", StringComparison.OrdinalIgnoreCase);
+            bool enabled = layer.DefaultEnabled;
+            if (s.LayerSettings.TryGetValue(layer.Name, out var stored))
+                enabled = bool.TryParse(stored, out var value) && value;
             _layers.Rows.Add(enabled, layer.Name, layer.Description);
         }
     }
@@ -314,7 +306,7 @@ public sealed class ExportSettingsForm : Form
             Populate(_settings);
             MessageBox.Show(this, $"Đã nạp cấu hình '{name}'.", "Nạp cấu hình", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Nạp mẫu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Nạp mẫu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
     private void SaveProfile()
     {
@@ -333,7 +325,7 @@ public sealed class ExportSettingsForm : Form
             _profileList.SelectedItem = name.Trim();
             MessageBox.Show(this, $"Đã lưu cấu hình '{name.Trim()}'.", "Lưu mẫu", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Lưu mẫu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Lưu mẫu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
     private void DeleteProfile()
     {
@@ -343,7 +335,7 @@ public sealed class ExportSettingsForm : Form
             return;
         }
         if (MessageBox.Show(this, "Xóa mẫu '" + name + "'?", "Xóa mẫu", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-        try { _profiles.Delete(name); RefreshProfiles(); } catch (Exception ex) { MessageBox.Show(ex.Message, "Xóa mẫu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        try { _profiles.Delete(name); RefreshProfiles(); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Xóa mẫu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
     private string? PromptProfileName(string initialName)
     {
@@ -364,8 +356,10 @@ public sealed class ExportSettingsForm : Form
         var prompt = new Label { Text = "Nhập tên khách hàng/dự án:", AutoSize = true, Anchor = AnchorStyles.Left };
         var name = new TextBox { Text = initialName, Dock = DockStyle.Fill };
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
-        var save = new Button { Text = "Lưu", DialogResult = DialogResult.OK, AutoSize = true };
-        var cancel = new Button { Text = "Hủy", DialogResult = DialogResult.Cancel, AutoSize = true };
+        var save = UiStyles.CreateButton("Lưu");
+        save.DialogResult = DialogResult.OK;
+        var cancel = UiStyles.CreateButton("Hủy");
+        cancel.DialogResult = DialogResult.Cancel;
         buttons.Controls.Add(save);
         buttons.Controls.Add(cancel);
         layout.Controls.Add(prompt, 0, 0);
@@ -406,8 +400,7 @@ public sealed class ExportSettingsForm : Form
     }
     private bool ValidateNumber(TextBox input, string label, decimal min, decimal max, int decimals)
     {
-        var numberStyles = NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite | NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint;
-        if (!decimal.TryParse(input.Text, numberStyles, CultureInfo.CurrentCulture, out var value) || value < min || value > max || decimal.Round(value, decimals) != value)
+        if (!UiNumberParser.TryParseDecimal(input.Text, CultureInfo.CurrentCulture, out var value) || value < min || value > max || decimal.Round(value, decimals) != value)
         {
             MessageBox.Show(this, $"{label} phải là số từ {min} đến {max}, tối đa {decimals} chữ số thập phân.", "Giá trị không hợp lệ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             input.Focus();
@@ -416,10 +409,15 @@ public sealed class ExportSettingsForm : Form
         }
         return true;
     }
-    private static double ReadNumber(TextBox input) => (double)decimal.Parse(
-        input.Text,
-        NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite | NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
-        CultureInfo.CurrentCulture);
+    private static double ReadNumber(TextBox input) =>
+        (double)UiNumberParser.ParseDecimal(input.Text, CultureInfo.CurrentCulture);
+
+    private static ExportSettings CreateWorkingCopy(ExportSettings settings)
+    {
+        var copy = new ExportSettings();
+        ExportSettingsSnapshot.From(settings).Apply(copy);
+        return copy;
+    }
 
 }
 

@@ -8,16 +8,24 @@ Source: [Autodesk Support — SelectSet is empty on edited components in an Inve
 
 ## Part save event
 
-The local Inventor 2027 API index records `DocumentEvents.OnSave(EventTimingEnum BeforeOrAfter, NameValueMap Context, ref HandlingCodeEnum HandlingCode)` and links to Autodesk Help. The skill reference notes that the generated 2027 event delegate must be inspected because COM events may have `ref` parameters. Direct Help fetch for the guessed topic URL returned Page Not Found; therefore the current code deliberately does not subscribe to OnSave until the exact interop event source/delegate signatures can be checked on the Windows Inventor 2027 build machine.
+The Inventor 2027 API index records `DocumentEvents.OnSave(EventTimingEnum BeforeOrAfter, NameValueMap Context, ref HandlingCodeEnum HandlingCode)` and links to Autodesk Help. The add-in still does not subscribe to `OnSave`; automatic metadata updates during user saves remain a separate feature and require host-runtime validation.
 
-Sources: local workspace `skills/inventor-2027-addin/api/API_INDEX.md`, row `Inventor.DocumentEvents`; local workspace `skills/inventor-2027-addin/skills/inventor-2027-addin/references/events.md`; attempted Autodesk Help URL: https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-API/files/DocumentEvents_OnSave.htm (Page Not Found at fetch time).
+Sources: [Skill/api/API_INDEX.md](./Skill/api/API_INDEX.md), row `Inventor.DocumentEvents`; [Skill/references/events.md](./Skill/references/events.md).
+
+## Ribbon reset event
+
+The add-in subscribes to `UserInterfaceEventsSink_Event.OnResetRibbonInterface` and recreates only missing add-in tabs. Its C# event handler is `void Handler(NameValueMap Context)`. The signature was confirmed from the installed Inventor 2027 interop assembly (`31.10.26700.0`) and `Autodesk.Inventor.Interop.xml`, member `M:Inventor.UserInterfaceEvents.OnResetRibbonInterface(Inventor.NameValueMap)`. The callback is detached during add-in deactivation.
+
+Source: [Autodesk Inventor 2027 — UserInterfaceEvents.OnResetRibbonInterface](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-API/files/UserInterfaceEvents_OnResetRibbonInterface.htm). Reference and compile verification do not imply that Ribbon reset behavior has been runtime-tested in Inventor.
 
 ## Flat-pattern DXF layer styling
 
-The Inventor 2027 `DataIO.WriteDataToFile` flat-pattern DXF options accept per-layer keys in the form `{LayerArgument}Color=R;G;B`, `{LayerArgument}LineType=<LineTypeEnum value>`, and `{LayerArgument}LineWeight=<double in centimeters>`. The exporter targets `AcadVersion=R12`, does not emit custom layer colors, and omits the lineweight option because the R12 target predates DXF lineweight metadata. Existing color values in older INI/profile files are ignored.
+The Inventor 2027 `DataIO.WriteDataToFile` flat-pattern DXF options accept per-layer keys in the form `{LayerArgument}Color=R;G;B`, `{LayerArgument}LineType=<LineTypeEnum value>`, and `{LayerArgument}LineWeight=<double in centimeters>`. The exporter targets `AcadVersion=R12`, does not emit custom layer colors, and omits the lineweight option because the R12 target predates DXF lineweight metadata.
 
-The `InvisibleLayers` option is a semicolon-separated list of layer names. Both the primary R12 option string and the reduced fallback option string must include the same layer mappings and hidden-layer list; otherwise a successful fallback export would silently restore Inventor's default visible layers.
+The `InvisibleLayers` option is a semicolon-separated list of layer names. The R12 option string includes the same layer mappings and hidden-layer list for each DataIO provider. Because Inventor can still write a named layer record into the DXF table, post-processing also removes entities on unchecked layers from `ENTITIES` and `BLOCKS` (while retaining block delimiters) and removes their `LAYER` table records. This cleanup is covered by DXF fixture tests; final output still requires an Inventor 2027 export and CAD-open check.
 
-The listed line-type values (default 37648, continuous 37633, dashed 37634, dotted 37636, dash-dotted 37638, dashed-hidden 37641, chain 37644) were verified against the installed Inventor 2027 interop and Autodesk's `LineTypeEnum` reference. This verifies option construction only; DXF export has not been runtime-tested in Inventor.
+`IV_MARK_SURFACE` is a user-requested visibility option: when disabled, its name is added to `InvisibleLayers`; when enabled, it is omitted from that list. The Autodesk sample verifies the option syntax, not that every Inventor document produces this exact layer. Confirm the layer name and visibility in Inventor 2027 before release.
+
+The production option string omits line types: the recorded assembly test showed all 60 parts failing the first `LineType` attempt before succeeding with options without `LineType`. Omitting the known-failing option avoids repeating that failure. The user has confirmed a successful Inventor 2027 run; host regression should be repeated when changing DXF export behavior.
 
 Sources: [Autodesk Inventor 2027 — WriteFlatPatternAsDXF sample](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-API/files/WriteFlatPatternAsDXF_Sample.htm), [Autodesk Inventor 2027 — LineTypeEnum](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-API/files/LineTypeEnum.htm), [Autodesk Inventor 2027 — DataIO.WriteDataToFile](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-API/files/DataIO_WriteDataToFile.htm).

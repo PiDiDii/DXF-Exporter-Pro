@@ -3,7 +3,7 @@ using System.Text;
 
 namespace InventorDxfExporter.Core;
 
-/// <summary>Pure string/file-name helpers lifted from the V14 behavior; no Inventor dependency.</summary>
+/// <summary>Pure string and file-name helpers with no Inventor dependency.</summary>
 public static class FileNameBuilder
 {
     public static string CleanName(string? value)
@@ -14,10 +14,9 @@ public static class FileNameBuilder
         return result.Replace(" ", "_");
     }
 
-    public static string BuildFileName(string? pattern, string thickness, int quantity, string material, string detailName)
+    public static string BuildFileName(string thickness, int quantity, string material, string detailName)
     {
-        var p = string.IsNullOrWhiteSpace(pattern) ? ExportSettings.DefaultFilePattern : pattern;
-        var result = p.Replace("{DoDay}", CleanName(thickness), StringComparison.Ordinal)
+        var result = ExportSettings.DefaultFilePattern.Replace("{DoDay}", CleanName(thickness), StringComparison.Ordinal)
             .Replace("{Qty}", "Q" + quantity.ToString(), StringComparison.Ordinal)
             .Replace("{VatLieu}", CleanName(material), StringComparison.Ordinal)
             .Replace("{TenChiTiet}", CleanName(detailName), StringComparison.Ordinal);

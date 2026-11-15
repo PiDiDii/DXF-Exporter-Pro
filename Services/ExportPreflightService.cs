@@ -1,8 +1,8 @@
-using Inventor;
+using InventorDxfExporter.Core;
 
 namespace InventorDxfExporter.Services;
 
-/// <summary>Read-only document checks; output metadata/name checks are added by the export command.</summary>
+/// <summary>Builds preflight results from the collection snapshot without traversing Inventor documents again.</summary>
 public sealed record ExportPreflightResult(
     IReadOnlyList<ExportPreflightItem> Items,
     IReadOnlyList<string> Warnings,
@@ -20,80 +20,47 @@ public sealed class ExportPreflightService
 {
     private const string SelectionCheck = "Inventor SelectSet chưa được áp dụng tự động; có thể chọn/bỏ chọn từng part trong danh sách xem trước.";
 
-    public ExportPreflightResult Inspect(PartDocument part)
+    public ExportPreflightResult Inspect(
+        IReadOnlyCollection<ExportItem> exportItems,
+        IReadOnlyCollection<string> skippedItems,
+        IReadOnlyCollection<string> collectionErrors,
+        IReadOnlyCollection<ExportItem> suppressedItems)
     {
-        ArgumentNullException.ThrowIfNull(part);
-        var items = new List<ExportPreflightItem>(); var warnings = new List<string>();
-        try
-        {
-            if (part.ComponentDefinition is not SheetMetalComponentDefinition sheetMetal)
-            {
-                items.Add(new ExportPreflightItem(part.DisplayName, false, null, false, false, null));
-                warnings.Add("Part không phải Sheet Metal; kiểm tra Flat Pattern không áp dụng.");
-            }
-            else
-            {
-                bool hasFlatPattern = sheetMetal.HasFlatPattern;
-                items.Add(new ExportPreflightItem(part.DisplayName, true, hasFlatPattern, false, false, null));
-                if (!hasFlatPattern) warnings.Add("Sheet Metal part thiếu Flat Pattern.");
-            }
-        }
-        catch (Exception ex)
-        {
-            items.Add(new ExportPreflightItem(part.DisplayName, false, null, false, false, ex.Message));
-            warnings.Add("Không thể kiểm tra đầy đủ part: " + ex.Message);
-        }
-        return CreateResult(items, warnings);
-    }
+        ArgumentNullException.ThrowIfNull(exportItems);
+        ArgumentNullException.ThrowIfNull(skippedItems);
+        ArgumentNullException.ThrowIfNull(collectionErrors);
+        ArgumentNullException.ThrowIfNull(suppressedItems);
+        var warnings = new List<string>();
+        warnings.AddRange(skippedItems
+            .Where(item => item.StartsWith("Suppressed:", StringComparison.OrdinalIgnoreCase))
+            .Select(item => item + "; sẽ không xuất part này."));
+        warnings.AddRange(collectionErrors.Select(error => "Không thể kiểm tra đầy đủ: " + error));
+        var duplicateNames = exportItems
+            .GroupBy(item => item.DetailName, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-    public ExportPreflightResult Inspect(AssemblyDocument assembly)
-    {
-        ArgumentNullException.ThrowIfNull(assembly);
-        var items = new List<ExportPreflightItem>(); var warnings = new List<string>();
-        try
+        var items = exportItems.Select(item =>
         {
-            var leaves = assembly.ComponentDefinition.Occurrences.AllLeafOccurrences[Type.Missing];
-            for (var index = 1; index <= leaves.Count; index++)
+            bool? hasFlatPattern = item.FlatPatternSizeIssue switch
             {
-                try
-                {
-                    var occurrence = (ComponentOccurrence)leaves[index];
-                    var label = occurrence.Name;
-                    if (occurrence.Suppressed)
-                    {
-                        items.Add(new ExportPreflightItem(label, false, null, true, false, null));
-                        warnings.Add($"Occurrence '{label}' bị suppressed; không truy cập definition.");
-                        continue;
-                    }
-                    if (occurrence.Definition is not SheetMetalComponentDefinition sheetMetal)
-                    {
-                        items.Add(new ExportPreflightItem(label, false, null, false, false, null));
-                        continue;
-                    }
-                    bool hasFlatPattern = sheetMetal.HasFlatPattern;
-                    items.Add(new ExportPreflightItem(label, true, hasFlatPattern, false, false, null));
-                    if (!hasFlatPattern) warnings.Add($"Sheet Metal occurrence '{label}' thiếu Flat Pattern.");
-                }
-                catch (Exception ex)
-                {
-                    items.Add(new ExportPreflightItem($"Occurrence #{index}", false, null, false, false, ex.Message));
-                    warnings.Add($"Không thể kiểm tra occurrence #{index}: {ex.Message}");
-                }
-            }
-        }
-        catch (Exception ex) { warnings.Add("Không thể duyệt assembly hoặc có reference chưa resolve: " + ex.Message); }
-        MarkDuplicateOccurrenceNames(items, warnings);
-        return CreateResult(items, warnings);
-    }
+                null => true,
+                "Chưa có Flat Pattern" => false,
+                _ => null
+            };
+            if (hasFlatPattern == false)
+                warnings.Add($"Sheet Metal part '{item.DetailName}' thiếu Flat Pattern.");
+            else if (item.FlatPatternSizeIssue is not null)
+                warnings.Add($"'{item.DetailName}': {item.FlatPatternSizeIssue}");
+            if (duplicateNames.Contains(item.DetailName))
+                warnings.Add($"Trùng tên chi tiết '{item.DetailName}'. Kiểm tra tên file xuất dự kiến.");
+            return new ExportPreflightItem(item.DetailName, true, hasFlatPattern, false,
+                duplicateNames.Contains(item.DetailName), item.FlatPatternSizeIssue);
+        }).Concat(suppressedItems.Select(item =>
+            new ExportPreflightItem(item.DetailName, true, null, true, false, null))).ToArray();
 
-    private static void MarkDuplicateOccurrenceNames(List<ExportPreflightItem> items, List<string> warnings)
-    {
-        var duplicateNames = items.Where(x => !x.IsSuppressed && x.InspectionError is null)
-            .GroupBy(x => x.Label, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1)
-            .Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (duplicateNames.Count == 0) return;
-        for (int i = 0; i < items.Count; i++) if (duplicateNames.Contains(items[i].Label)) items[i] = items[i] with { HasDuplicateName = true };
-        foreach (var name in duplicateNames) warnings.Add($"Trùng occurrence name '{name}'. Đây không nhất thiết là trùng tên file xuất.");
+        return CreateResult(items, warnings.Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 
     private static ExportPreflightResult CreateResult(IReadOnlyList<ExportPreflightItem> items, IReadOnlyList<string> warnings) =>

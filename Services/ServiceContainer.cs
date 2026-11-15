@@ -3,7 +3,7 @@ using InventorApplication = Inventor.Application;
 
 namespace InventorDxfExporter.Services;
 
-/// <summary>Application-lifetime composition root for the V14 services.</summary>
+/// <summary>Application-lifetime composition root for Inventor export services.</summary>
 public sealed class ServiceContainer
 {
     public IPartInfoService PartInfo { get; }
@@ -16,7 +16,7 @@ public sealed class ServiceContainer
         ArgumentNullException.ThrowIfNull(application);
         PartInfo = new PartInfoServiceImplementation();
         Bom = new BomServiceImplementation(application);
-        DxfExport = new DxfExportServiceImplementation(application, PartInfo, Bom);
+        DxfExport = new DxfExportServiceImplementation(application, Bom);
         Convert = new ConvertServiceImplementation(application);
     }
 }

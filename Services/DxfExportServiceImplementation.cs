@@ -9,31 +9,50 @@ using IOPath = System.IO.Path;
 
 namespace InventorDxfExporter.Services;
 
-/// <summary>G1 V14-compatible DXF export pipeline, isolated from UI; COM operations stay on Inventor's STA.</summary>
+/// <summary>DXF export pipeline, isolated from UI; COM operations stay on Inventor's STA.</summary>
 public sealed class DxfExportServiceImplementation : IDxfExportService
 {
-    private const string DxfTranslatorId = "{C24E3AC4-122E-11D5-8E91-0010B541CD80}";
     private readonly Inventor.Application? _application;
-    private readonly IPartInfoService? _partInfo;
     private readonly IBomService? _bom;
     private readonly DxfProcessor _processor = new();
 
     public DxfExportServiceImplementation() { }
-    public DxfExportServiceImplementation(Inventor.Application application, IPartInfoService partInfo, IBomService bom)
+    public DxfExportServiceImplementation(Inventor.Application application, IBomService bom)
     {
         _application = application ?? throw new ArgumentNullException(nameof(application));
-        _partInfo = partInfo ?? throw new ArgumentNullException(nameof(partInfo));
         _bom = bom ?? throw new ArgumentNullException(nameof(bom));
     }
 
     public OperationResult Export(Document document, ExportSettings settings) => Export(document, settings, NullOperationMonitor.Instance, null);
 
-    public IReadOnlyList<ExportItem> CollectItems(Document document)
+    public IReadOnlyList<ExportItem> CollectItems(Document document) =>
+        CollectItems(document, NullOperationMonitor.Instance);
+
+    public IReadOnlyList<ExportItem> CollectItems(Document document, IOperationMonitor? monitor)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        monitor ??= NullOperationMonitor.Instance;
+        var items = new Dictionary<string, WorkItem>(StringComparer.OrdinalIgnoreCase);
+        var skipped = new List<string>();
+        var errors = new List<string>();
+        var suppressed = new List<ExportItem>();
+        CollectDocumentItems(document, items, skipped, errors, suppressed, monitor);
+        return items.Values.Select(x => x.Item).ToArray();
+    }
+
+    public IReadOnlyList<ExportItem> CollectItems(
+        Document document,
+        out IReadOnlyList<string> skippedItems,
+        out IReadOnlyList<string> collectionErrors,
+        out IReadOnlyList<ExportItem> suppressedItems)
     {
         ArgumentNullException.ThrowIfNull(document);
         var items = new Dictionary<string, WorkItem>(StringComparer.OrdinalIgnoreCase);
         var skipped = new List<string>(); var errors = new List<string>(); var suppressed = new List<ExportItem>();
-        CollectDocumentItems(document, items, skipped, errors, suppressed);
+        CollectDocumentItems(document, items, skipped, errors, suppressed, NullOperationMonitor.Instance);
+        skippedItems = skipped;
+        collectionErrors = errors;
+        suppressedItems = suppressed;
         return items.Values.Select(x => x.Item).ToArray();
     }
 
@@ -46,7 +65,7 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
         var skipped = new List<string>(); var errors = new List<string>(); var suppressed = new List<ExportItem>();
         var log = new StringBuilder(); var outputLines = new StringBuilder();
         var totalTimer = Stopwatch.StartNew();
-        var dxfTimer = new Stopwatch(); var postTimer = new Stopwatch(); var infoTimer = new Stopwatch(); var bomTimer = new Stopwatch();
+        var dxfTimer = new Stopwatch(); var postTimer = new Stopwatch(); var bomTimer = new Stopwatch();
         bool oldScreen = true, oldSilent = false, fastApplied = false;
         int exported = 0, skippedExisting = 0, bendCount = 0, deletedSuppressed = 0;
         string reportPath = string.Empty;
@@ -56,10 +75,11 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
             if (settings.FastMode && _application is not null)
             {
                 oldScreen = _application.ScreenUpdating; oldSilent = _application.SilentOperation;
-                _application.ScreenUpdating = false; _application.SilentOperation = true; fastApplied = true;
+                fastApplied = true;
+                _application.ScreenUpdating = false; _application.SilentOperation = true;
             }
 
-            CollectDocumentItems(document, items, skipped, errors, suppressed);
+            CollectDocumentItems(document, items, skipped, errors, suppressed, monitor);
             if (selectedDocumentPaths is not null)
             {
                 var selected = new HashSet<string>(selectedDocumentPaths, StringComparer.OrdinalIgnoreCase);
@@ -71,7 +91,7 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
             if (string.IsNullOrWhiteSpace(settings.OutputRoot)) throw new InvalidOperationException("Chưa chọn thư mục xuất.");
 
             int index = 0;
-            foreach (var work in items.Values)
+            foreach (var work in items.Values.ToArray())
             {
                 monitor.CancellationToken.ThrowIfCancellationRequested();
                 var item = work.Item; index++;
@@ -80,7 +100,7 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
                 {
                     string folder = IOPath.Combine(settings.OutputRoot, FileNameBuilder.CleanName(item.Material), FileNameBuilder.CleanName(item.Thickness));
                     Directory.CreateDirectory(folder);
-                    string path = IOPath.Combine(folder, FileNameBuilder.BuildFileName(settings.FilePattern, item.Thickness, item.Quantity, item.Material, item.DetailName));
+                    string path = IOPath.Combine(folder, FileNameBuilder.BuildFileName(item.Thickness, item.Quantity, item.Material, item.DetailName));
                     if (IOFile.Exists(path))
                     {
                         if (settings.OverwriteMode == "Bỏ qua file đã có") { skippedExisting++; outputLines.AppendLine("BỎ QUA FILE ĐÃ CÓ: " + path); continue; }
@@ -94,27 +114,35 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
                     try
                     {
                         dxfTimer.Start();
-                        bool usedFallbackOptions;
-                        try { usedFallbackOptions = ExportOnePart(work.Document, temporaryDxfPath, settings, BuildDxfOptions(settings)); }
+                        string? fallbackWarning;
+                        try
+                        {
+                            ExportOnePart(work.Document, temporaryDxfPath, BuildDxfOptions(settings), out fallbackWarning);
+                            var refreshedSize = GetFlatPatternSize(work.Document,
+                                (SheetMetalComponentDefinition)work.Document.ComponentDefinition);
+                            item = item with
+                            {
+                                FlatPatternXmm = refreshedSize.Xmm,
+                                FlatPatternYmm = refreshedSize.Ymm,
+                                FlatPatternSizeIssue = refreshedSize.Issue
+                            };
+                            items[item.DocumentPath] = work with { Item = item };
+                        }
                         finally { dxfTimer.Stop(); }
                         postTimer.Start();
                         try
                         {
                             var options = new DxfProcessOptions(BuildDxfOptions(settings), settings.BendMode, settings.BendUpLen, settings.BendUpInset,
                                 settings.BendDownLen, settings.BendDownInset, settings.AddInfoText, settings.TextAlignment,
-                                settings.TextHeight, settings.TextLineGap, settings.TextYOffset);
+                                settings.TextHeight, settings.TextLineGap, settings.TextYOffset,
+                                DxfLayerOptionsBuilder.GetInvisibleLayers(settings));
                             bendCount += _processor.Process(temporaryDxfPath, path, options, item).BendLinesProcessed;
                         }
                         finally { postTimer.Stop(); }
-                        if (settings.UpdateInfoAndBom && _partInfo is not null)
-                        {
-                            infoTimer.Start();
-                            try { _partInfo.UpdateFromFlatPattern(work.Document, true); }
-                            catch (Exception ex) { errors.Add(item.DetailName + " (cập nhật Description/Thickness): " + ex.Message); }
-                            finally { infoTimer.Stop(); }
-                        }
                         exported++;
-                        outputLines.AppendLine((usedFallbackOptions ? "OK (tùy chọn DXF tối giản): " : "OK: ") + path);
+                        if (!string.IsNullOrWhiteSpace(fallbackWarning))
+                            outputLines.AppendLine("CẢNH BÁO: " + item.DetailName + ": " + fallbackWarning);
+                        outputLines.AppendLine((string.IsNullOrWhiteSpace(fallbackWarning) ? "OK: " : "OK (DataIO thay thế): ") + path);
                     }
                     finally
                     {
@@ -127,13 +155,14 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
 
             monitor.CancellationToken.ThrowIfCancellationRequested();
             string bomPath = string.Empty;
-            if (settings.UpdateInfoAndBom && _bom is not null)
+            if (settings.ExportBomAfterDxf && _bom is not null)
             {
                 bomTimer.Start();
                 try
                 {
                     var bomSettings = new InventorDxfExporter.Settings.BomExportSettingsStore().Load();
-                    bomPath = _bom.Export(items.Values.Select(x => x.Item).ToArray(), bomSettings);
+                    bomPath = _bom.Export(items.Values.Select(x => x.Item).ToArray(), bomSettings,
+                        BomServiceImplementation.GetProjectName(document), monitor);
                     if (_bom is BomServiceImplementation bomImpl) errors.AddRange(bomImpl.Errors);
                 }
                 catch (Exception ex) { errors.Add("Xuất BOM: " + ex.Message); }
@@ -146,7 +175,7 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
                 {
                     if (old.DocumentPath.Length > 0 && items.ContainsKey(old.DocumentPath)) continue;
                     string stalePath = IOPath.Combine(settings.OutputRoot, FileNameBuilder.CleanName(old.Material), FileNameBuilder.CleanName(old.Thickness),
-                        FileNameBuilder.BuildFileName(settings.FilePattern, old.Thickness, old.Quantity, old.Material, old.DetailName));
+                        FileNameBuilder.BuildFileName(old.Thickness, old.Quantity, old.Material, old.DetailName));
                     if (!IOFile.Exists(stalePath)) continue;
                     if (settings.CleanupSuppressed) { IOFile.Delete(stalePath); deletedSuppressed++; }
                     else outputLines.AppendLine("CẢNH BÁO: File cũ của part Suppress vẫn còn: " + stalePath);
@@ -158,7 +187,7 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
             var report = new StringBuilder();
             report.AppendLine("HOÀN TẤT XUẤT DXF");
             report.AppendLine("Thời gian (giây): Tổng " + Seconds(totalTimer) + " | Xuất DXF (Unfold+DataIO) " + Seconds(dxfTimer) +
-                " | Xử lý file DXF " + Seconds(postTimer) + " | Cập nhật thuộc tính + Save " + Seconds(infoTimer) + " | BOM " + Seconds(bomTimer));
+                " | Xử lý file DXF " + Seconds(postTimer) + " | BOM " + Seconds(bomTimer));
             report.AppendLine("Part duy nhất: " + items.Count); report.AppendLine("Đã xuất: " + exported); report.AppendLine("Bỏ qua file đã có: " + skippedExisting);
             report.AppendLine("Bỏ qua khi duyệt: " + skipped.Count); if (settings.BendMode == "Chỉ đánh dấu 2 đầu") report.AppendLine("Đường chấn đã đánh dấu: " + bendCount);
             report.AppendLine("Lỗi: " + errors.Count); report.AppendLine("File suppressed đã xóa: " + deletedSuppressed);
@@ -188,55 +217,99 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
         {
             if (fastApplied && _application is not null)
             {
-                try { _application.SilentOperation = oldSilent; } catch { }
-                try { _application.ScreenUpdating = oldScreen; } catch { }
+                try { _application.SilentOperation = oldSilent; }
+                catch (Exception ex) { Trace.TraceError($"Không khôi phục được SilentOperation: {ex}"); }
+                try { _application.ScreenUpdating = oldScreen; }
+                catch (Exception ex) { Trace.TraceError($"Không khôi phục được ScreenUpdating: {ex}"); }
             }
         }
     }
 
-    private static void CollectDocumentItems(Document document, Dictionary<string, WorkItem> items, List<string> skipped, List<string> errors, List<ExportItem> suppressed)
+    private static void CollectDocumentItems(
+        Document document,
+        Dictionary<string, WorkItem> items,
+        List<string> skipped,
+        List<string> errors,
+        List<ExportItem> suppressed,
+        IOperationMonitor monitor)
     {
-        if (document.DocumentType == DocumentTypeEnum.kPartDocumentObject) AddPartItem(document as PartDocument, 1, items, skipped, errors);
+        if (document.DocumentType == DocumentTypeEnum.kPartDocumentObject)
+        {
+            monitor.CancellationToken.ThrowIfCancellationRequested();
+            AddPartItem(document as PartDocument, 1, items, skipped, errors);
+            monitor.Report(new OperationProgress(1, 1, document.DisplayName, "Đang thu thập chi tiết BOM"));
+        }
         else if (document.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject)
-            ScanOccurrences(((AssemblyDocument)document).ComponentDefinition.Occurrences, items, skipped, errors, suppressed);
+            ScanOccurrences(((AssemblyDocument)document).ComponentDefinition.Occurrences,
+                items, skipped, errors, suppressed, monitor);
         else skipped.Add("Chỉ hỗ trợ Part Sheet Metal hoặc Assembly.");
     }
 
-    private static void ScanOccurrences(ComponentOccurrences occurrences, Dictionary<string, WorkItem> items, List<string> skipped, List<string> errors, List<ExportItem> suppressed)
+    private static void ScanOccurrences(
+        ComponentOccurrences occurrences,
+        Dictionary<string, WorkItem> items,
+        List<string> skipped,
+        List<string> errors,
+        List<ExportItem> suppressed,
+        IOperationMonitor monitor)
     {
-        ScanOccurrences(occurrences.Count, index => (ComponentOccurrence)occurrences[index], items, skipped, errors, suppressed);
-    }
-
-    private static void ScanOccurrences(ComponentOccurrencesEnumerator occurrences, Dictionary<string, WorkItem> items, List<string> skipped, List<string> errors, List<ExportItem> suppressed)
-    {
-        ScanOccurrences(occurrences.Count, index => (ComponentOccurrence)occurrences[index], items, skipped, errors, suppressed);
-    }
-
-    private static void ScanOccurrences(int count, Func<int, ComponentOccurrence> getOccurrence, Dictionary<string, WorkItem> items, List<string> skipped, List<string> errors, List<ExportItem> suppressed)
-    {
-        for (int index = 1; index <= count; index++)
+        var count = occurrences.Count;
+        for (var index = 1; index <= count; index++)
         {
-            var occurrence = getOccurrence(index);
-            try
-            {
-                if (occurrence.Suppressed) { skipped.Add("Suppressed: " + occurrence.Name); TryCollectSuppressed(occurrence, suppressed); continue; }
-                if (occurrence.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject) ScanOccurrences(occurrence.SubOccurrences, items, skipped, errors, suppressed);
-                else if (occurrence.DefinitionDocumentType == DocumentTypeEnum.kPartDocumentObject) AddPartItem(occurrence.Definition.Document as PartDocument, 1, items, skipped, errors);
-            }
-            catch (Exception ex) { errors.Add(occurrence.Name + ": " + ex.Message); }
+            monitor.CancellationToken.ThrowIfCancellationRequested();
+            var occurrence = (ComponentOccurrence)occurrences[index];
+            ScanOccurrence(occurrence, items, skipped, errors, suppressed, monitor);
+            monitor.Report(new OperationProgress(index, count, occurrence.Name, "Đang thu thập chi tiết BOM"));
         }
     }
 
-    private static void TryCollectSuppressed(ComponentOccurrence occurrence, List<ExportItem> suppressed)
+    private static void ScanOccurrence(
+        ComponentOccurrence occurrence,
+        Dictionary<string, WorkItem> items,
+        List<string> skipped,
+        List<string> errors,
+        List<ExportItem> suppressed,
+        IOperationMonitor monitor)
+    {
+        monitor.CancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            if (occurrence.Suppressed)
+            {
+                skipped.Add("Suppressed: " + occurrence.Name);
+                TryCollectSuppressed(occurrence, suppressed, errors);
+                return;
+            }
+
+            if (occurrence.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject)
+            {
+                var subOccurrences = occurrence.SubOccurrences;
+                for (var index = 1; index <= subOccurrences.Count; index++)
+                    ScanOccurrence((ComponentOccurrence)subOccurrences[index], items, skipped, errors, suppressed, monitor);
+            }
+            else if (occurrence.DefinitionDocumentType == DocumentTypeEnum.kPartDocumentObject)
+                AddPartItem(occurrence.Definition.Document as PartDocument, 1, items, skipped, errors);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            errors.Add(occurrence.Name + ": " + ex.Message);
+        }
+    }
+
+    private static void TryCollectSuppressed(ComponentOccurrence occurrence, List<ExportItem> suppressed, List<string> errors)
     {
         try
         {
             if (occurrence.DefinitionDocumentType != DocumentTypeEnum.kPartDocumentObject) return;
             var part = occurrence.Definition.Document as PartDocument;
             if (part?.ComponentDefinition is not SheetMetalComponentDefinition sm || string.IsNullOrEmpty(part.FullFileName)) return;
-            suppressed.Add(new ExportItem(part.FullFileName, IOPath.GetFileNameWithoutExtension(part.DisplayName), GetMaterial(part), GetThickness(sm), 1));
+            suppressed.Add(new ExportItem(part.FullFileName, IOPath.GetFileNameWithoutExtension(part.FullFileName), GetMaterial(part), GetThickness(sm), 1));
         }
-        catch { }
+        catch (Exception ex) { errors.Add(occurrence.Name + " (suppressed metadata): " + ex.Message); }
     }
 
     private static void AddPartItem(PartDocument? part, int quantity, Dictionary<string, WorkItem> items, List<string> skipped, List<string> errors)
@@ -252,7 +325,7 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
             {
                 var (xMm, yMm, sizeIssue) = GetFlatPatternSize(part, sm);
                 items.Add(part.FullFileName, new WorkItem(
-                    new ExportItem(part.FullFileName, IOPath.GetFileNameWithoutExtension(part.DisplayName),
+                    new ExportItem(part.FullFileName, IOPath.GetFileNameWithoutExtension(part.FullFileName),
                         GetMaterial(part), GetThickness(sm), quantity, xMm, yMm, sizeIssue),
                     part));
             }
@@ -268,22 +341,10 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
         {
             if (!sheetMetal.HasFlatPattern)
                 return (null, null, "Chưa có Flat Pattern");
-
-            var bounds = sheetMetal.FlatPattern.RangeBox;
-            var units = part.UnitsOfMeasure;
-            var x = units.ConvertUnits(Math.Abs(bounds.MaxPoint.X - bounds.MinPoint.X),
-                UnitsTypeEnum.kDatabaseLengthUnits, UnitsTypeEnum.kMillimeterLengthUnits);
-            var y = units.ConvertUnits(Math.Abs(bounds.MaxPoint.Y - bounds.MinPoint.Y),
-                UnitsTypeEnum.kDatabaseLengthUnits, UnitsTypeEnum.kMillimeterLengthUnits);
-            var z = units.ConvertUnits(Math.Abs(bounds.MaxPoint.Z - bounds.MinPoint.Z),
-                UnitsTypeEnum.kDatabaseLengthUnits, UnitsTypeEnum.kMillimeterLengthUnits);
-            var planarExtents = new[] { x, y, z }.OrderByDescending(extent => extent).Take(2).ToArray();
-            if (planarExtents.Any(extent => !double.IsFinite(extent) || extent <= 0))
-                return (null, null, "Kích thước Flat Pattern không hợp lệ");
-
-            return (planarExtents[0], planarExtents[1], null);
+            var dimensions = FlatPatternDimensionsReader.Read(part, sheetMetal);
+            return (dimensions.LongSideMm, dimensions.ShortSideMm, null);
         }
-        catch (System.Runtime.InteropServices.COMException ex)
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidDataException)
         {
             return (null, null, "Không đọc được kích thước Flat Pattern: " + ex.Message);
         }
@@ -299,22 +360,20 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
         catch { return "T_Khong_Xac_Dinh"; }
     }
 
-    private bool ExportOnePart(PartDocument part, string path, ExportSettings settings, string options)
+    private void ExportOnePart(PartDocument part, string path, string options, out string? fallbackWarning)
     {
+        fallbackWarning = null;
         if (part.ComponentDefinition is not SheetMetalComponentDefinition sm) throw new InvalidOperationException("Không phải Sheet Metal.");
         if (!sm.HasFlatPattern) sm.Unfold();
         if (!sm.HasFlatPattern) throw new InvalidOperationException("Không tạo được Flat Pattern.");
-        try
-        {
-            var app = part.Parent as Inventor.Application;
-            if (app?.ApplicationAddIns.ItemById[DxfTranslatorId] is TranslatorAddIn translator && !translator.Activated) translator.Activate();
-        }
-        catch { }
         var exportErrors = new List<Exception>();
-        if (TryWriteDxf(sm.DataIO, options, path, "SheetMetal.DataIO với tùy chọn hiện tại", exportErrors)) return false;
-        if (TryWriteDxf(sm.DataIO, BuildFallbackDxfOptions(settings), path, "SheetMetal.DataIO với tùy chọn DXF tối giản", exportErrors)) return true;
-        if (TryWriteDxf(sm.FlatPattern.DataIO, options, path, "FlatPattern.DataIO với tùy chọn hiện tại", exportErrors)) return false;
-        if (TryWriteDxf(sm.FlatPattern.DataIO, BuildFallbackDxfOptions(settings), path, "FlatPattern.DataIO với tùy chọn DXF tối giản", exportErrors)) return true;
+        if (TryWriteDxf(sm.DataIO, options, path, "SheetMetal.DataIO", exportErrors)) return;
+        if (TryWriteDxf(sm.FlatPattern.DataIO, options, path, "FlatPattern.DataIO", exportErrors))
+        {
+            fallbackWarning = "SheetMetal.DataIO không xuất được; đã xuất qua FlatPattern.DataIO. " +
+                string.Join(" | ", exportErrors.Select(error => error.Message));
+            return;
+        }
 
         throw new InvalidOperationException("Không thể xuất DXF hợp lệ bằng SheetMetal.DataIO hoặc FlatPattern.DataIO. " +
             string.Join(" | ", exportErrors.Select(error => error.Message)), new AggregateException(exportErrors));
@@ -337,8 +396,7 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
         }
     }
 
-    private static string BuildDxfOptions(ExportSettings settings) => DxfLayerOptionsBuilder.Build(settings, includeLineTypes: true);
-    private static string BuildFallbackDxfOptions(ExportSettings settings) => DxfLayerOptionsBuilder.Build(settings, includeLineTypes: false);
+    private static string BuildDxfOptions(ExportSettings settings) => DxfLayerOptionsBuilder.Build(settings);
     private static string Seconds(Stopwatch timer) => (timer.ElapsedMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture);
     private sealed record WorkItem(ExportItem Item, PartDocument Document);
 }

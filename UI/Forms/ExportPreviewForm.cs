@@ -25,17 +25,16 @@ public sealed class ExportPreviewForm : Form
         Margin = new Padding(2, 0, 8, 0)
     };
     private readonly Button _selectAll = UiStyles.CreateButton("Chọn/Bỏ chọn tất cả");
-    private readonly Button _settings = UiStyles.CreateButton("Cài đặt");
     private readonly Button _export = UiStyles.CreateButton("Xuất DXF", primary: true);
     private readonly Button _close = UiStyles.CreateButton("Đóng");
 
-    public ExportPreviewForm(IReadOnlyList<ExportItem> items, ExportSettings settings)
+    public ExportPreviewForm(IReadOnlyList<ExportItem> items)
     {
         UiStyles.Initialize(this);
         Text = "Danh sách chi tiết xuất DXF";
         StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new System.Drawing.Size(820, 460);
-        ClientSize = new System.Drawing.Size(920, 550);
+        MinimumSize = new System.Drawing.Size(700, 420);
+        ClientSize = new System.Drawing.Size(820, 480);
         FormBorderStyle = FormBorderStyle.Sizable;
 
         ConfigureGrid();
@@ -94,8 +93,6 @@ public sealed class ExportPreviewForm : Form
         CancelButton = _close;
         UpdateSelectionSummary();
     }
-
-    public event EventHandler? SettingsRequested;
 
     public IReadOnlyList<string> SelectedDocumentPaths
     {
@@ -209,11 +206,9 @@ public sealed class ExportPreviewForm : Form
             var selectedCount = CountSelected();
             SetAll(selectedCount != _grid.Rows.Count);
         };
-        _settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         _export.DialogResult = DialogResult.OK;
         _close.DialogResult = DialogResult.Cancel;
         ConfigureFooterButton(_selectAll, 184);
-        ConfigureFooterButton(_settings, 108);
         ConfigureFooterButton(_export, 112);
         ConfigureFooterButton(_close, 98);
 
@@ -228,7 +223,6 @@ public sealed class ExportPreviewForm : Form
         };
         actions.Controls.Add(_close);
         actions.Controls.Add(_export);
-        actions.Controls.Add(_settings);
         actions.Controls.Add(_selectAll);
         footer.Controls.Add(_selectionSummary, 0, 0);
         footer.Controls.Add(actions, 1, 0);
@@ -242,15 +236,8 @@ public sealed class ExportPreviewForm : Form
         button.Margin = new Padding(6, 2, 0, 2);
     }
 
-    private static string FormatThickness(string value)
-    {
-        var displayValue = value.StartsWith('T') ? value[1..] : value;
-        if (double.TryParse(displayValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var thickness))
-            return thickness.ToString("0.###", CultureInfo.CurrentCulture);
-        return displayValue.Equals("_Khong_Xac_Dinh", StringComparison.OrdinalIgnoreCase)
-            ? "Chưa xác định"
-            : displayValue;
-    }
+    private static string FormatThickness(string value) =>
+        BomDimensionFormatter.FormatThicknessDisplay(value);
 
     private static string FormatFlatPatternSize(ExportItem item)
     {

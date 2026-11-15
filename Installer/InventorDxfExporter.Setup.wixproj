@@ -3,6 +3,8 @@
     <OutputType>Package</OutputType>
     <OutputName>InventorDxfExporter-Setup</OutputName>
     <DefineConstants>PayloadDir=$(PayloadDir);ProductVersion=$(ProductVersion)</DefineConstants>
+    <!-- The package intentionally installs only to Inventor's per-user Add-ins folder. -->
+    <SuppressIces>ICE91</SuppressIces>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(PayloadWxs)" Condition="'$(PayloadWxs)' != ''" />

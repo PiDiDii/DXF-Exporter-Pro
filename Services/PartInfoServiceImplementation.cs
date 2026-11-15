@@ -6,8 +6,7 @@ using IOPath = System.IO.Path;
 namespace InventorDxfExporter.Services;
 
 /// <summary>
-/// V14-compatible part metadata reader/updater. This class intentionally does not
-/// change the existing IPartInfoService or the surrounding service registrations.
+/// Reads part metadata for BOM export.
 /// </summary>
 public sealed class PartInfoServiceImplementation : IPartInfoService
 {
@@ -23,53 +22,6 @@ public sealed class PartInfoServiceImplementation : IPartInfoService
             GetDescriptionProp(part),
             GetThicknessCustomProp(part),
             GetMaterial(part));
-    }
-
-    public PartInfo UpdateFromFlatPattern(PartDocument part, bool saveIfDirty)
-    {
-        ArgumentNullException.ThrowIfNull(part);
-
-        var sheetMetal = part.ComponentDefinition as SheetMetalComponentDefinition;
-        if (sheetMetal is not null)
-        {
-            // V14 reads the named Thickness parameter and interprets Inventor database
-            // length units (centimeters) as millimeters by multiplying by 10.
-            var thicknessParameter = sheetMetal.Parameters["Thickness"];
-            var thicknessMm = Math.Round(System.Convert.ToDouble(thicknessParameter.Value, CultureInfo.InvariantCulture) * 10.0, 2);
-
-            if (!sheetMetal.HasFlatPattern)
-                sheetMetal.Unfold();
-
-            var flatPattern = sheetMetal.FlatPattern;
-            var flatWidthMm = Math.Round(flatPattern.Width * 10.0, 1);
-            var flatLengthMm = Math.Round(flatPattern.Length * 10.0, 1);
-            var description = string.Concat(
-                FormatNumberVn(flatLengthMm), " x ",
-                FormatNumberVn(flatWidthMm), " x ",
-                FormatNumberVn(thicknessMm));
-
-            part.PropertySets[DesignTrackingProperties]
-                ["Description"].Value = description;
-
-            var thicknessText = thicknessMm.ToString(CultureInfo.InvariantCulture) + " mm";
-            var customProperties = part.PropertySets[UserDefinedProperties];
-            try
-            {
-                customProperties["Thickness"].Value = thicknessText;
-            }
-            catch
-            {
-                // V14 creates the user-defined property when it does not yet exist.
-                customProperties.Add(thicknessText, "Thickness");
-            }
-        }
-
-        // V14 saves only if the part became dirty; saveIfDirty is the explicit opt-in
-        // exposed by the existing service contract.
-        if (saveIfDirty && part.Dirty)
-            part.Save();
-
-        return Read(part);
     }
 
     private static string GetPartNumber(PartDocument part)
@@ -130,7 +82,4 @@ public sealed class PartInfoServiceImplementation : IPartInfoService
             return "Khong_Xac_Dinh";
         }
     }
-
-    private static string FormatNumberVn(double value) =>
-        value.ToString("0.##", CultureInfo.InvariantCulture).Replace('.', ',');
 }

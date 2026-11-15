@@ -11,6 +11,7 @@
     <InventorBinPath Condition="'$(InventorBinPath)' == ''">C:\Program Files\Autodesk\Inventor 2027\Bin</InventorBinPath>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="obj\**\*.cs" />
     <Compile Remove="Preview\**\*.cs" />
     <Compile Remove="Skill\**\*.cs" />
     <Compile Remove="Tests\DxfProcessorValidation\**\*.cs" />
@@ -27,6 +28,5 @@
       <EmbedInteropTypes>false</EmbedInteropTypes>
       <Private>false</Private>
     </Reference>
-    <None Update="InventorDxfExporter.addin" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

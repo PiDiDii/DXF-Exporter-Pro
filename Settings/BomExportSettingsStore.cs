@@ -5,7 +5,7 @@ namespace InventorDxfExporter.Settings;
 
 public sealed class BomExportSettingsStore
 {
-    private const int CurrentSchemaVersion = 1;
+    private const int CurrentSchemaVersion = 2;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public string FilePath { get; }
@@ -30,12 +30,12 @@ public sealed class BomExportSettingsStore
         var settings = JsonSerializer.Deserialize<BomExportSettings>(File.ReadAllText(FilePath), JsonOptions)
             ?? throw new InvalidDataException($"Không đọc được cấu hình BOM: {FilePath}");
         MergeDefaultColumns(settings);
-        if (settings.SchemaVersion < CurrentSchemaVersion)
+        if (settings.SchemaVersion < 1)
         {
             settings.Columns.First(column =>
                 column.Field.Equals("Hình ảnh", StringComparison.OrdinalIgnoreCase)).Enabled = true;
-            settings.SchemaVersion = CurrentSchemaVersion;
         }
+        settings.SchemaVersion = CurrentSchemaVersion;
         return settings;
     }
 

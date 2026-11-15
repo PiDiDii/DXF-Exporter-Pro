@@ -5,11 +5,10 @@ public sealed class ExportSettings
     public const string DefaultFilePattern = "{DoDay}_{Qty}_{VatLieu}_{TenChiTiet}";
 
     public string OutputRoot { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-    public string FilePattern { get; set; } = DefaultFilePattern;
     public string OverwriteMode { get; set; } = "Hỏi từng file";
     public bool FastMode { get; set; } = true;
     public bool CleanupSuppressed { get; set; }
-    public bool UpdateInfoAndBom { get; set; } = true;
+    public bool ExportBomAfterDxf { get; set; }
     public bool AddInfoText { get; set; }
     public string TextAlignment { get; set; } = "Căn giữa";
     public double TextHeight { get; set; } = 10;
@@ -20,19 +19,14 @@ public sealed class ExportSettings
     public double BendUpInset { get; set; } = 3;
     public double BendDownLen { get; set; } = 3;
     public double BendDownInset { get; set; } = 3;
-    public int ActionIndex { get; set; } = 1;
-    public bool DoConvert { get; set; }
-    public bool DoExport { get; set; } = true;
     public string ConvFilter { get; set; } = string.Empty;
     public int ConvMode { get; set; } = 2;
     public bool ConvSkipExisting { get; set; } = true;
     public double ConvTolerance { get; set; } = 0.01;
     public string ConvLogFolder { get; set; } = string.Empty;
+    public bool ConvWriteLog { get; set; } = true;
     public Dictionary<string, string> LayerSettings { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public Dictionary<string, LayerExportStyle> LayerStyles { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
-
-public sealed record LayerExportStyle(int LineType = 37648, double LineWeightMm = 0.5);
 
 public sealed record LayerRow(string Name, bool Enabled);
 

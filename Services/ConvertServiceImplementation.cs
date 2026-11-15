@@ -11,11 +11,7 @@ using InventorPoint = Inventor.Point;
 
 namespace InventorDxfExporter.Services;
 
-/// <summary>
-/// V14 Convert STEP -> Sheet Metal implementation. API members translated from
-/// Source/V14_Original.iLogicVb; verify against the installed Inventor 2027 interop
-/// and host before deploying (see notes in the delegated task report).
-/// </summary>
+/// <summary>Converts imported parts to sheet metal and creates a flat pattern.</summary>
 public sealed class ConvertServiceImplementation : IConvertService
 {
     private const string SheetMetalSubtype = "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}";
@@ -48,17 +44,21 @@ public sealed class ConvertServiceImplementation : IConvertService
                 ? IOPath.GetDirectoryName(assembly.FullFileName) ?? IOEnvironment.GetFolderPath(IOEnvironment.SpecialFolder.Desktop)
                 : IOEnvironment.GetFolderPath(IOEnvironment.SpecialFolder.Desktop);
         }
-        try
+        if (settings.ConvWriteLog)
         {
-            if (!Directory.Exists(logFolder)) Directory.CreateDirectory(logFolder);
-        }
-        catch
-        {
-            logFolder = IOEnvironment.GetFolderPath(IOEnvironment.SpecialFolder.Desktop);
+            try
+            {
+                if (!Directory.Exists(logFolder)) Directory.CreateDirectory(logFolder);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceWarning($"Không tạo được thư mục log '{logFolder}': {ex.Message}");
+                logFolder = IOEnvironment.GetFolderPath(IOEnvironment.SpecialFolder.Desktop);
+            }
         }
 
         var log = new StringBuilder();
-        log.AppendLine("SM BATCH CONVERTER - tích hợp V14 (logic v2.0.2: 2 chế độ Thickness, fix stale-face, bỏ Unfold Rule, bỏ ExitEdit gây E_FAIL, log lỗi chi tiết)");
+        log.AppendLine("SM BATCH CONVERTER - Inventor 2027");
         log.AppendLine("Chế độ    : " + (conversionMode == 1 ? "1 - Tự phát hiện độ dày, điền thủ công" : "2 - Tự phát hiện độ dày, khớp Sheet Metal Rule"));
         log.AppendLine("Dung sai  : ±" + toleranceMm.ToString("0.000", CultureInfo.InvariantCulture) + " mm");
         log.AppendLine("Thời gian : " + DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture));
@@ -182,8 +182,10 @@ public sealed class ConvertServiceImplementation : IConvertService
         }
         finally
         {
-            try { _application.SilentOperation = oldSilent; } catch { }
-            try { _application.ScreenUpdating = oldScreenUpdating; } catch { }
+            try { _application.SilentOperation = oldSilent; }
+            catch (Exception ex) { Trace.TraceError($"Không khôi phục được SilentOperation sau Convert: {ex}"); }
+            try { _application.ScreenUpdating = oldScreenUpdating; }
+            catch (Exception ex) { Trace.TraceError($"Không khôi phục được ScreenUpdating sau Convert: {ex}"); }
             stopwatch.Stop();
         }
 
@@ -195,11 +197,21 @@ public sealed class ConvertServiceImplementation : IConvertService
         log.AppendLine("Thời gian  : " + (stopwatch.ElapsedMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " giây");
         log.AppendLine("Kết thúc   : " + DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture));
 
-        var logFile = IOPath.Combine(logFolder, "SM_Log_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + ".txt");
-        try { IOFile.WriteAllText(logFile, log.ToString(), Encoding.UTF8); }
-        catch { logFile = "(không ghi được file log)"; }
+        var logFile = string.Empty;
+        var resultMessages = new List<string>();
+        if (settings.ConvWriteLog)
+        {
+            logFile = IOPath.Combine(logFolder, "SM_Log_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + ".txt");
+            try { IOFile.WriteAllText(logFile, log.ToString(), Encoding.UTF8); }
+            catch (Exception ex)
+            {
+                Trace.TraceError($"Không ghi được log Convert '{logFile}': {ex}");
+                resultMessages.Add("Không ghi được file log: " + ex.Message);
+                logFile = string.Empty;
+            }
+        }
 
-        return new OperationResult(successCount, skipCount, errorCount, logFile, Array.Empty<string>());
+        return new OperationResult(successCount, skipCount, errorCount, logFile, resultMessages);
     }
 
     private static double SafeThicknessToCm(object? raw)
@@ -232,7 +244,7 @@ public sealed class ConvertServiceImplementation : IConvertService
                     bestRule = rule;
                 }
             }
-            catch { /* V14: ignore a style whose Thickness cannot be read. */ }
+            catch { /* Ignore styles whose Thickness cannot be read. */ }
         }
         return bestRule;
     }

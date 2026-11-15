@@ -1,5 +1,6 @@
 using Inventor;
 using InventorDxfExporter.Core;
+using InventorDxfExporter.UI.Forms;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -14,6 +15,9 @@ public sealed class RibbonCommandSet
     private readonly InventorApplication _application;
     private readonly Dictionary<ButtonDefinitionSink_Event, ButtonDefinitionSink_OnExecuteEventHandler> _subscriptions = new();
     private readonly List<ButtonDefinition> _definitions = new();
+    private UserInterfaceEventsSink_Event? _userInterfaceEvents;
+    private UserInterfaceEventsSink_OnResetRibbonInterfaceEventHandler? _resetRibbonHandler;
+    private static int _isExecuting;
     private static readonly Dictionary<IconKind, IconPair> IconCache = new();
 
     public RibbonCommandSet(InventorApplication application) =>
@@ -28,13 +32,52 @@ public sealed class RibbonCommandSet
         var bom = new ExportBomCommand(_application);
 
         var convertButton = Define("Convert STEP", "ConvertStep",
-            "Chuyển các part STEP trong Assembly thành Sheet Metal và tạo Flat Pattern.", "Convert STEP", IconKind.Convert, convert.Execute);
+            "Chuyển các part STEP trong Assembly thành Sheet Metal và tạo Flat Pattern.", "Convert STEP", IconKind.Convert,
+            () =>
+            {
+                try { convert.Execute(); }
+                finally { RestoreRibbonTabs(); }
+            });
         var exportButton = Define("Xuất DXF", "ExportDxf",
             "Kiểm tra, xem trước và xuất DXF cho part Sheet Metal trong tài liệu hiện hành.", "Xuất DXF", IconKind.Dxf, export.Execute);
         var bomButton = Define("Xuất BOM", "ExportBom",
             "Tạo bảng BOM Excel (.xlsx) bằng ClosedXML; không yêu cầu cài Microsoft Excel.", "Xuất BOM", IconKind.Bom, bom.Execute);
 
-        // Versioned IDs let Inventor replace the previous layout for existing installations.
+        _userInterfaceEvents = (UserInterfaceEventsSink_Event)_application.UserInterfaceManager.UserInterfaceEvents;
+        _resetRibbonHandler = OnResetRibbonInterface;
+        _userInterfaceEvents.OnResetRibbonInterface += _resetRibbonHandler;
+
+        if (firstTime || !HasCurrentRibbonTabs())
+        {
+            Trace.TraceInformation("Khởi tạo các Ribbon tab DXF Exporter còn thiếu.");
+            EnsureRibbonTabs(convertButton, exportButton, bomButton);
+        }
+    }
+
+    private bool HasCurrentRibbonTabs() =>
+        HasRibbonTab("Assembly", "InventorDxfExporter.Assembly.V4.Tab")
+        && HasRibbonTab("Part", "InventorDxfExporter.Part.V4.Tab");
+
+    private bool HasRibbonTab(string ribbonName, string tabInternalName)
+    {
+        try
+        {
+            var tabs = _application.UserInterfaceManager.Ribbons[ribbonName].RibbonTabs;
+            for (var index = 1; index <= tabs.Count; index++)
+            {
+                if (string.Equals(tabs[index].InternalName, tabInternalName, StringComparison.Ordinal))
+                    return true;
+            }
+        }
+        catch (System.Runtime.InteropServices.COMException ex)
+        {
+            Trace.TraceWarning($"Không thể kiểm tra Ribbon '{ribbonName}': {ex.Message}");
+        }
+        return false;
+    }
+
+    private void EnsureRibbonTabs(ButtonDefinition convertButton, ButtonDefinition exportButton, ButtonDefinition bomButton)
+    {
         AddTab("Assembly", "DXF Exporter", "InventorDxfExporter.Assembly.V4.Tab",
             new PanelLayout("Thao tác", "InventorDxfExporter.Assembly.V4.CommandsPanel", new[]
             {
@@ -46,6 +89,23 @@ public sealed class RibbonCommandSet
             {
                 new ButtonLayout(exportButton), new ButtonLayout(bomButton)
             }));
+    }
+
+    private void OnResetRibbonInterface(NameValueMap context)
+        => RestoreRibbonTabs();
+
+    private void RestoreRibbonTabs()
+    {
+        try
+        {
+            if (_definitions.Count < 3)
+                return;
+            EnsureRibbonTabs(_definitions[0], _definitions[1], _definitions[2]);
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceError($"Không thể khôi phục Ribbon DXF Exporter: {ex}");
+        }
     }
 
     private void RemoveRetiredRibbonTabs()
@@ -96,12 +156,19 @@ public sealed class RibbonCommandSet
         var sink = (ButtonDefinitionSink_Event)button;
         ButtonDefinitionSink_OnExecuteEventHandler handler = _ =>
         {
+            if (System.Threading.Interlocked.CompareExchange(ref _isExecuting, 1, 0) != 0)
+            {
+                Trace.TraceWarning($"Bỏ qua lệnh '{displayName}' vì một thao tác DXF Exporter khác đang chạy.");
+                return;
+            }
             try { execute(); }
             catch (Exception ex)
             {
                 Trace.TraceError($"{displayName}: {ex}");
-                MessageBox.Show(ex.Message, displayName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(new InventorWindowOwner(_application.MainFrameHWND),
+                    ex.Message, displayName, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+            finally { System.Threading.Interlocked.Exchange(ref _isExecuting, 0); }
         };
         sink.OnExecute += handler;
         _subscriptions.Add(sink, handler);
@@ -114,6 +181,11 @@ public sealed class RibbonCommandSet
         var ribbon = _application.UserInterfaceManager.Ribbons[ribbonName];
         try
         {
+            for (var index = 1; index <= ribbon.RibbonTabs.Count; index++)
+            {
+                if (string.Equals(ribbon.RibbonTabs[index].InternalName, tabInternalName, StringComparison.Ordinal))
+                    return;
+            }
             var tab = ribbon.RibbonTabs.Add(tabName, tabInternalName, ClientId, string.Empty, false, false);
             foreach (var panelLayout in panels)
             {
@@ -125,7 +197,8 @@ public sealed class RibbonCommandSet
         }
         catch (System.Runtime.InteropServices.COMException ex)
         {
-            Trace.TraceInformation($"Ribbon tab '{tabInternalName}' already exists or could not be recreated: {ex.Message}");
+            Trace.TraceError($"Không thể tạo Ribbon tab '{tabInternalName}': {ex}");
+            throw;
         }
     }
 
@@ -210,6 +283,13 @@ public sealed class RibbonCommandSet
 
     public void Deactivate()
     {
+        if (_userInterfaceEvents is not null && _resetRibbonHandler is not null)
+        {
+            try { _userInterfaceEvents.OnResetRibbonInterface -= _resetRibbonHandler; }
+            catch (Exception ex) { Trace.TraceWarning($"Không thể gỡ sự kiện khôi phục Ribbon: {ex.Message}"); }
+        }
+        _userInterfaceEvents = null;
+        _resetRibbonHandler = null;
         foreach (var pair in _subscriptions)
         {
             try { pair.Key.OnExecute -= pair.Value; }

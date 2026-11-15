@@ -8,11 +8,18 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <Compile Include="..\..\Core\BomDimensionFormatter.cs" Link="BomDimensionFormatter.cs" />
     <Compile Include="..\..\Core\DxfProcessor.cs" Link="DxfProcessor.cs" />
+    <Compile Include="..\..\Core\OperationProgress.cs" Link="OperationProgress.cs" />
+    <Compile Include="..\..\Core\FileNameBuilder.cs" Link="FileNameBuilder.cs" />
     <Compile Include="..\..\Core\ExportModels.cs" Link="ExportModels.cs" />
     <Compile Include="..\..\Core\DxfLayerOptionsBuilder.cs" Link="DxfLayerOptionsBuilder.cs" />
+    <Compile Include="..\..\Core\UiNumberParser.cs" Link="UiNumberParser.cs" />
     <Compile Include="..\..\Core\BomExportSettings.cs" Link="BomExportSettings.cs" />
     <Compile Include="..\..\Services\BomTemplateWriter.cs" Link="BomTemplateWriter.cs" />
     <Compile Include="..\..\Settings\BomExportSettingsStore.cs" Link="BomExportSettingsStore.cs" />
+    <Compile Include="..\..\Settings\ExportSettingsStore.cs" Link="ExportSettingsStore.cs" />
+    <Compile Include="..\..\Settings\ExportSettingsSnapshot.cs" Link="ExportSettingsSnapshot.cs" />
+    <Compile Include="..\..\Settings\SettingsProfileStore.cs" Link="SettingsProfileStore.cs" />
   </ItemGroup>
 </Project>

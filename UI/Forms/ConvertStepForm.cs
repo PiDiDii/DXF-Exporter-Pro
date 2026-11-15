@@ -27,16 +27,18 @@ public sealed class ConvertStepForm : Form
         TextAlign = HorizontalAlignment.Right
     };
     private readonly TextBox _logFolder = new() { Dock = DockStyle.Fill };
+    private readonly CheckBox _writeLog = new() { Text = "Ghi file log sau mỗi lần Convert", AutoSize = true };
 
     public ConvertStepForm(ExportSettings settings)
     {
         UiStyles.Initialize(this);
         Text = "Convert STEP";
         StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox = false;
         MaximizeBox = false;
-        ClientSize = new System.Drawing.Size(760, 570);
+        ClientSize = new System.Drawing.Size(720, 600);
+        MinimumSize = new System.Drawing.Size(620, 420);
 
         _filter.Text = settings.ConvFilter;
         _filter.PlaceholderText = "Để trống để xử lý tất cả Part STEP";
@@ -44,6 +46,7 @@ public sealed class ConvertStepForm : Form
         _tolerance.Value = Math.Clamp((decimal)settings.ConvTolerance, _tolerance.Minimum, _tolerance.Maximum);
         _logFolder.Text = settings.ConvLogFolder;
         _logFolder.PlaceholderText = "Chọn nơi lưu nhật ký chuyển đổi";
+        _writeLog.Checked = settings.ConvWriteLog;
         _detectThickness.Checked = settings.ConvMode == 1;
         _matchRule.Checked = !_detectThickness.Checked;
 
@@ -72,8 +75,8 @@ public sealed class ConvertStepForm : Form
         content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var filterSection = UiStyles.CreateSection("Phạm vi");
-        var filterGrid = CreateFieldGrid(1);
-        filterGrid.Controls.Add(CreateFieldLabel("Lọc tên Part"), 0, 0);
+        var filterGrid = UiStyles.CreateFieldGrid(1);
+        filterGrid.Controls.Add(UiStyles.CreateFieldLabel("Lọc tên Part"), 0, 0);
         filterGrid.Controls.Add(_filter, 1, 0);
         filterSection.Controls.Add(filterGrid);
 
@@ -104,24 +107,15 @@ public sealed class ConvertStepForm : Form
         modeSection.Controls.Add(modeLayout);
 
         var outputSection = UiStyles.CreateSection("Kết quả và nhật ký");
-        var outputGrid = CreateFieldGrid(2);
+        var outputGrid = UiStyles.CreateFieldGrid(3);
         outputGrid.Controls.Add(_skip, 1, 0);
         outputGrid.SetColumnSpan(_skip, 2);
-        outputGrid.Controls.Add(CreateFieldLabel("Thư mục log"), 0, 1);
-        outputGrid.Controls.Add(_logFolder, 1, 1);
-        var browse = UiStyles.CreateButton("Duyệt...");
-        browse.Click += (_, _) =>
-        {
-            using var dialog = new FolderBrowserDialog
-            {
-                SelectedPath = _logFolder.Text,
-                Description = "Chọn thư mục lưu log Convert",
-                ShowNewFolderButton = true
-            };
-            if (dialog.ShowDialog(this) == DialogResult.OK)
-                _logFolder.Text = dialog.SelectedPath;
-        };
-        outputGrid.Controls.Add(browse, 2, 1);
+        outputGrid.Controls.Add(_writeLog, 1, 1);
+        outputGrid.SetColumnSpan(_writeLog, 2);
+        outputGrid.Controls.Add(UiStyles.CreateFieldLabel("Thư mục log"), 0, 2);
+        outputGrid.Controls.Add(_logFolder, 1, 2);
+        var browse = UiStyles.CreateFolderPicker(this, _logFolder, "Duyệt", "Chọn thư mục lưu log Convert");
+        outputGrid.Controls.Add(browse, 2, 2);
         outputSection.Controls.Add(outputGrid);
 
         content.Controls.Add(filterSection, 0, 0);
@@ -146,33 +140,7 @@ public sealed class ConvertStepForm : Form
         settings.ConvSkipExisting = _skip.Checked;
         settings.ConvTolerance = (double)_tolerance.Value;
         settings.ConvLogFolder = _logFolder.Text.Trim();
-        settings.DoConvert = true;
-        settings.DoExport = false;
-        settings.ActionIndex = 0;
+        settings.ConvWriteLog = _writeLog.Checked;
     }
 
-    private static TableLayoutPanel CreateFieldGrid(int rows)
-    {
-        var grid = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(10, 4, 10, 6),
-            ColumnCount = 3,
-            RowCount = rows
-        };
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104));
-        for (var index = 0; index < rows; index++)
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / rows));
-        return grid;
-    }
-
-    private static Label CreateFieldLabel(string text) => new()
-    {
-        Text = text,
-        AutoSize = true,
-        Anchor = AnchorStyles.Left,
-        Margin = new Padding(0, 2, 8, 2)
-    };
 }

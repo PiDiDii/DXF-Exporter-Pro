@@ -1,4 +1,5 @@
 using InventorDxfExporter.Core;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace InventorDxfExporter.UI.Forms;
@@ -7,6 +8,8 @@ namespace InventorDxfExporter.UI.Forms;
 public sealed class OperationProgressForm : Form, IOperationMonitor
 {
     private readonly CancellationTokenSource _cancellation = new();
+    private readonly IntPtr _inventorHandle;
+    private readonly int _uiThreadId = Environment.CurrentManagedThreadId;
     private readonly ProgressBar _bar = new()
     {
         Dock = DockStyle.Fill,
@@ -18,9 +21,11 @@ public sealed class OperationProgressForm : Form, IOperationMonitor
     private readonly Label _item = new() { Dock = DockStyle.Fill, AutoEllipsis = true, ForeColor = UiStyles.MutedText };
     private readonly Button _cancel = UiStyles.CreateButton("Hủy");
     private bool _completed;
+    private bool _pumpingMessages;
 
-    public OperationProgressForm(string title)
+    public OperationProgressForm(string title, IWin32Window? inventorOwner = null)
     {
+        _inventorHandle = inventorOwner?.Handle ?? IntPtr.Zero;
         UiStyles.Initialize(this);
         Text = title;
         StartPosition = FormStartPosition.CenterParent;
@@ -29,7 +34,7 @@ public sealed class OperationProgressForm : Form, IOperationMonitor
         MaximizeBox = false;
         ControlBox = false;
         ShowInTaskbar = false;
-        ClientSize = new System.Drawing.Size(560, 310);
+        ClientSize = new System.Drawing.Size(500, 260);
 
         var root = new TableLayoutPanel
         {
@@ -56,7 +61,7 @@ public sealed class OperationProgressForm : Form, IOperationMonitor
         details.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
         details.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         details.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        _stage.Font = new System.Drawing.Font("Segoe UI Semibold", 10F, System.Drawing.FontStyle.Bold);
+        _stage.Font = UiStyles.ProgressFont;
         details.Controls.Add(_stage, 0, 0);
         details.Controls.Add(_bar, 0, 1);
         details.Controls.Add(_item, 0, 2);
@@ -88,8 +93,37 @@ public sealed class OperationProgressForm : Form, IOperationMonitor
         _bar.Value = progress.Percent;
         _stage.Text = $"{progress.Stage} — {progress.Completed}/{progress.Total}";
         _item.Text = progress.CurrentItem;
-        System.Windows.Forms.Application.DoEvents();
+        _stage.Refresh();
+        _item.Refresh();
+        _bar.Refresh();
+        PumpProgressMessages();
         _cancellation.Token.ThrowIfCancellationRequested();
+    }
+
+    private void PumpProgressMessages()
+    {
+        if (Environment.CurrentManagedThreadId != _uiThreadId)
+            throw new InvalidOperationException("Tiến trình Inventor phải được cập nhật trên luồng UI đã tạo form.");
+        if (_pumpingMessages)
+            throw new InvalidOperationException("Không cho phép gọi lồng cập nhật tiến trình.");
+
+        _pumpingMessages = true;
+        var hostWasEnabled = _inventorHandle != IntPtr.Zero
+            && IsWindow(_inventorHandle)
+            && IsWindowEnabled(_inventorHandle);
+        if (hostWasEnabled)
+            EnableWindow(_inventorHandle, false);
+        try
+        {
+            // Keep cancellation responsive without allowing ribbon commands to re-enter Inventor work.
+            System.Windows.Forms.Application.DoEvents();
+        }
+        finally
+        {
+            if (hostWasEnabled && IsWindow(_inventorHandle))
+                EnableWindow(_inventorHandle, true);
+            _pumpingMessages = false;
+        }
     }
 
     public void MarkCompleted()
@@ -128,4 +162,16 @@ public sealed class OperationProgressForm : Form, IOperationMonitor
             _cancellation.Dispose();
         base.Dispose(disposing);
     }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowEnabled(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnableWindow(IntPtr handle, [MarshalAs(UnmanagedType.Bool)] bool enable);
 }

@@ -10,8 +10,8 @@ public sealed class PreflightReviewForm : Form
         UiStyles.Initialize(this);
         Text = "Kiểm tra trước khi xuất";
         StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new System.Drawing.Size(780, 500);
-        Size = new System.Drawing.Size(980, 680);
+        MinimumSize = new System.Drawing.Size(960, 620);
+        ClientSize = new System.Drawing.Size(1100, 800);
         FormBorderStyle = FormBorderStyle.Sizable;
 
         var grid = new DataGridView
@@ -50,7 +50,7 @@ public sealed class PreflightReviewForm : Form
         var summary = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
-            WrapContents = false,
+            WrapContents = true,
             Padding = new Padding(18, 8, 18, 4),
             BackColor = UiStyles.Canvas
         };
@@ -64,12 +64,12 @@ public sealed class PreflightReviewForm : Form
 
         var review = new SplitContainer
         {
-            Size = new System.Drawing.Size(800, 500),
+            Size = new System.Drawing.Size(1060, 540),
             Dock = DockStyle.Fill,
             Orientation = Orientation.Horizontal,
-            SplitterDistance = 200,
-            Panel1MinSize = 160,
-            Panel2MinSize = 100,
+            SplitterDistance = 500,
+            Panel1MinSize = 260,
+            Panel2MinSize = 120,
             BackColor = UiStyles.Canvas,
             Padding = new Padding(18, 0, 18, 8)
         };
@@ -86,7 +86,7 @@ public sealed class PreflightReviewForm : Form
             IntegralHeight = false,
             BackColor = UiStyles.Surface,
             ForeColor = UiStyles.Text,
-            Font = new System.Drawing.Font("Segoe UI", 9F)
+            Font = UiStyles.RegularFont
         };
         foreach (var warning in result.Warnings)
             messages.Items.Add("CẢNH BÁO  ·  " + warning);
@@ -128,7 +128,7 @@ public sealed class PreflightReviewForm : Form
         Text = text,
         AutoSize = true,
         ForeColor = color,
-        Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold),
+        Font = UiStyles.SemiboldFont,
         Margin = new Padding(0, 5, 24, 0)
     };
 }

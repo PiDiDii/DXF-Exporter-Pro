@@ -3,7 +3,7 @@ param(
     [string]$Configuration = 'Release',
     [string]$InventorBinPath = 'C:\Program Files\Autodesk\Inventor 2027\Bin',
     [string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist'),
-    [string]$ProductVersion = '1.0.0'
+    [string]$ProductVersion = '1.0.2'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,6 +28,7 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
 
 $stagingRoot = Join-Path $env:TEMP ("InventorDxfExporter-Msi-" + [guid]::NewGuid().ToString('N'))
 $payloadDirectory = Join-Path $stagingRoot 'payload'
+$addinIntermediateDirectory = Join-Path $stagingRoot 'addin-obj'
 $payloadWxs = Join-Path $stagingRoot 'PayloadFiles.wxs'
 $wixOutputDirectory = Join-Path $stagingRoot 'wix-bin'
 $wixIntermediateDirectory = Join-Path $stagingRoot 'wix-obj'
@@ -36,12 +37,18 @@ $installPackage = Join-Path $OutputDirectory 'InventorDxfExporter-Setup.msi'
 try {
     New-Item -ItemType Directory -Path $payloadDirectory -Force | Out-Null
     $msbuildProperty = "-p:InventorBinPath=$InventorBinPath"
+    $addinIntermediate = $addinIntermediateDirectory.Replace('\', '/') + '/'
 
-    dotnet restore $project $msbuildProperty
+    dotnet restore $project $msbuildProperty `
+        "-p:BaseIntermediateOutputPath=$addinIntermediate" `
+        "-p:MSBuildProjectExtensionsPath=$addinIntermediate"
     if ($LASTEXITCODE -ne 0) { throw "Add-in restore failed ($LASTEXITCODE)." }
 
     $payloadOutput = $payloadDirectory.Replace('\', '/') + '/'
-    dotnet build $project -c $Configuration --no-restore $msbuildProperty "-p:OutputPath=$payloadOutput"
+    dotnet build $project -c $Configuration --no-restore $msbuildProperty `
+        "-p:BaseIntermediateOutputPath=$addinIntermediate" `
+        "-p:MSBuildProjectExtensionsPath=$addinIntermediate" `
+        "-p:OutputPath=$payloadOutput"
     if ($LASTEXITCODE -ne 0) { throw "Add-in build failed ($LASTEXITCODE)." }
 
     $addInAssembly = Join-Path $payloadDirectory 'InventorDxfExporter.dll'

@@ -9,23 +9,29 @@ public sealed class DxfExportForm : Form
     private readonly ComboBox _overwrite = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _fast = new() { Text = "Tắt cập nhật giao diện khi xuất", AutoSize = true };
     private readonly CheckBox _cleanup = new() { Text = "Xóa DXF cũ của Part đang Suppress", AutoSize = true };
-    private readonly CheckBox _update = new() { Text = "Cập nhật Description/Thickness và xuất BOM", AutoSize = true };
+    private readonly CheckBox _exportBom = new() { Text = "Xuất thêm BOM sau khi xuất DXF", AutoSize = true };
+    private readonly Button _settings = UiStyles.CreateButton("Cài đặt");
+    private readonly ToolTip _toolTips = new();
 
     public DxfExportForm(ExportSettings settings)
     {
         UiStyles.Initialize(this);
         Text = "Xuất DXF";
         StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox = false;
         MaximizeBox = false;
-        ClientSize = new System.Drawing.Size(720, 440);
+        ClientSize = new System.Drawing.Size(700, 500);
+        MinimumSize = new System.Drawing.Size(700, 500);
 
         _output.Text = settings.OutputRoot;
         _output.PlaceholderText = "Chọn thư mục lưu DXF";
         _fast.Checked = settings.FastMode;
         _cleanup.Checked = settings.CleanupSuppressed;
-        _update.Checked = settings.UpdateInfoAndBom;
+        _exportBom.Checked = settings.ExportBomAfterDxf;
+        _toolTips.SetToolTip(_cleanup,
+            "Xóa các file DXF cũ đã xuất cho các Part đang bị Suppress trong assembly khỏi thư mục xuất. " +
+            "Không xóa Part hoặc Assembly trong Inventor. Khi tắt, các file DXF cũ được giữ lại và ghi cảnh báo trong báo cáo.");
         _overwrite.Items.AddRange(new object[] { "Hỏi trước khi ghi đè", "Ghi đè tự động", "Bỏ qua file đã có" });
         _overwrite.SelectedIndex = settings.OverwriteMode switch
         {
@@ -58,23 +64,12 @@ public sealed class DxfExportForm : Form
         content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var outputSection = UiStyles.CreateSection("Nơi lưu và file trùng");
-        var outputGrid = CreateFieldGrid(2);
-        outputGrid.Controls.Add(CreateFieldLabel("Thư mục xuất"), 0, 0);
+        var outputGrid = UiStyles.CreateFieldGrid(2);
+        outputGrid.Controls.Add(UiStyles.CreateFieldLabel("Thư mục xuất"), 0, 0);
         outputGrid.Controls.Add(_output, 1, 0);
-        var browse = UiStyles.CreateButton("Duyệt...");
-        browse.Click += (_, _) =>
-        {
-            using var dialog = new FolderBrowserDialog
-            {
-                SelectedPath = _output.Text,
-                Description = "Chọn thư mục cha để xuất DXF",
-                ShowNewFolderButton = true
-            };
-            if (dialog.ShowDialog(this) == DialogResult.OK)
-                _output.Text = dialog.SelectedPath;
-        };
+        var browse = UiStyles.CreateFolderPicker(this, _output, "Duyệt", "Chọn thư mục cha để xuất DXF");
         outputGrid.Controls.Add(browse, 2, 0);
-        outputGrid.Controls.Add(CreateFieldLabel("Nếu file đã tồn tại"), 0, 1);
+        outputGrid.Controls.Add(UiStyles.CreateFieldLabel("Nếu file đã tồn tại"), 0, 1);
         outputGrid.Controls.Add(_overwrite, 1, 1);
         outputGrid.SetColumnSpan(_overwrite, 2);
         outputSection.Controls.Add(outputGrid);
@@ -87,10 +82,9 @@ public sealed class DxfExportForm : Form
             ColumnCount = 1,
             RowCount = 3
         };
-        options.RowStyles.Add(new RowStyle(SizeType.Percent, 33.3F));
-        options.RowStyles.Add(new RowStyle(SizeType.Percent, 33.3F));
-        options.RowStyles.Add(new RowStyle(SizeType.Percent, 33.4F));
-        options.Controls.Add(_update, 0, 0);
+        for (var index = 0; index < 3; index++)
+            options.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 3));
+        options.Controls.Add(_exportBom, 0, 0);
         options.Controls.Add(_fast, 0, 1);
         options.Controls.Add(_cleanup, 0, 2);
         optionsSection.Controls.Add(options);
@@ -99,6 +93,7 @@ public sealed class DxfExportForm : Form
         content.Controls.Add(optionsSection, 0, 1);
         root.Controls.Add(content, 0, 1);
 
+        _settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         var run = UiStyles.CreateButton("Tiếp tục", primary: true);
         run.DialogResult = DialogResult.None;
         run.Click += (_, _) =>
@@ -114,16 +109,17 @@ public sealed class DxfExportForm : Form
         };
         var cancel = UiStyles.CreateButton("Hủy");
         cancel.DialogResult = DialogResult.Cancel;
-        root.Controls.Add(UiStyles.CreateFooter(run, cancel), 0, 2);
+        root.Controls.Add(UiStyles.CreateFooter(run, cancel, _settings), 0, 2);
         Controls.Add(root);
         AcceptButton = run;
         CancelButton = cancel;
     }
 
+    public event EventHandler? SettingsRequested;
+
     public void ApplyTo(ExportSettings settings)
     {
         settings.OutputRoot = _output.Text.Trim();
-        settings.FilePattern = ExportSettings.DefaultFilePattern;
         settings.OverwriteMode = _overwrite.SelectedIndex switch
         {
             1 => "Ghi đè tự động",
@@ -132,34 +128,13 @@ public sealed class DxfExportForm : Form
         };
         settings.FastMode = _fast.Checked;
         settings.CleanupSuppressed = _cleanup.Checked;
-        settings.UpdateInfoAndBom = _update.Checked;
-        settings.DoExport = true;
-        settings.DoConvert = false;
-        settings.ActionIndex = 1;
+        settings.ExportBomAfterDxf = _exportBom.Checked;
     }
 
-    private static TableLayoutPanel CreateFieldGrid(int rows)
+    protected override void Dispose(bool disposing)
     {
-        var grid = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(10, 4, 10, 6),
-            ColumnCount = 3,
-            RowCount = rows
-        };
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104));
-        for (var index = 0; index < rows; index++)
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / rows));
-        return grid;
+        if (disposing)
+            _toolTips.Dispose();
+        base.Dispose(disposing);
     }
-
-    private static Label CreateFieldLabel(string text) => new()
-    {
-        Text = text,
-        AutoSize = true,
-        Anchor = AnchorStyles.Left,
-        Margin = new Padding(0, 2, 8, 2)
-    };
 }

@@ -27,7 +27,7 @@ internal sealed class PreviewDashboardForm : Form
             ("Xuất DXF", () => ShowDialog(new DxfExportForm(CreateSettings()))),
             ("Convert STEP", () => ShowDialog(new ConvertStepForm(CreateSettings()))),
             ("Xuất BOM", () => ShowDialog(new BomForm(new BomExportSettings(), _ => { }))),
-            ("Danh sách xem trước DXF", () => ShowExportPreview(items, settings)),
+            ("Danh sách xem trước DXF", () => ShowExportPreview(items)),
             ("Kiểm tra trước khi xuất", () => ShowDialog(new PreflightReviewForm(preflight))),
             ("Tiến trình thao tác", ShowProgressPreview)
         };
@@ -82,15 +82,9 @@ internal sealed class PreviewDashboardForm : Form
         using (form) form.ShowDialog(this);
     }
 
-    private void ShowExportPreview(IReadOnlyList<ExportItem> items, ExportSettings settings)
+    private void ShowExportPreview(IReadOnlyList<ExportItem> items)
     {
-        using var preview = new ExportPreviewForm(items, settings);
-        preview.SettingsRequested += (_, _) =>
-        {
-            using var settingsForm = new ExportSettingsForm(settings);
-            if (settingsForm.ShowDialog(preview) == DialogResult.OK)
-                settingsForm.ApplyTo(settings);
-        };
+        using var preview = new ExportPreviewForm(items);
         preview.ShowDialog(this);
     }
 
@@ -128,7 +122,6 @@ internal sealed class PreviewDashboardForm : Form
         var settings = new ExportSettings
         {
             OutputRoot = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-            FilePattern = ExportSettings.DefaultFilePattern,
             AddInfoText = true,
             BendMode = "Chỉ đánh dấu 2 đầu",
             TextAlignment = "Căn giữa",

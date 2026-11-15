@@ -1,6 +1,5 @@
 using InventorDxfExporter.Core;
 using System.Drawing.Imaging;
-using System.Globalization;
 using Inventor;
 using InventorApplication = Inventor.Application;
 
@@ -18,10 +17,24 @@ public sealed class BomServiceImplementation : IBomService
 
     public IReadOnlyList<string> Errors => _errors;
 
-    public string Export(IReadOnlyCollection<ExportItem> items, BomExportSettings settings)
+    public static string GetProjectName(Document document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var documentName = string.IsNullOrWhiteSpace(document.FullFileName)
+            ? document.DisplayName
+            : document.FullFileName;
+        return System.IO.Path.GetFileNameWithoutExtension(documentName);
+    }
+
+    public string Export(
+        IReadOnlyCollection<ExportItem> items,
+        BomExportSettings settings,
+        string projectName,
+        IOperationMonitor? monitor = null)
     {
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(settings);
+        monitor ??= NullOperationMonitor.Instance;
         _errors.Clear();
 
         try
@@ -30,6 +43,7 @@ public sealed class BomServiceImplementation : IBomService
             var number = 1;
             foreach (var item in items)
             {
+                monitor.CancellationToken.ThrowIfCancellationRequested();
                 ArgumentNullException.ThrowIfNull(item);
                 var dimensions = FormatDimensions(item);
                 if (string.IsNullOrWhiteSpace(dimensions) && !string.IsNullOrWhiteSpace(item.FlatPatternSizeIssue))
@@ -55,11 +69,20 @@ public sealed class BomServiceImplementation : IBomService
                     dimensions,
                     item.Material,
                     item.Quantity,
-                    imageData));
+                    imageData,
+                    System.IO.Path.GetFileName(item.DocumentPath),
+                    item.DocumentPath,
+                    BomDimensionFormatter.FormatThicknessDisplay(item.Thickness)));
+                monitor.Report(new OperationProgress(rows.Count, items.Count + 1,
+                    item.DetailName, "Đang thu thập dữ liệu BOM"));
             }
 
-            var path = BomTemplateWriter.Write(settings, rows, DateTime.Now);
+            var path = BomTemplateWriter.Write(settings, rows, projectName, DateTime.Now, monitor);
             return path;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -68,12 +91,8 @@ public sealed class BomServiceImplementation : IBomService
         }
     }
 
-    private static string FormatDimensions(ExportItem item)
-    {
-        if (item.FlatPatternXmm is not double x || item.FlatPatternYmm is not double y)
-            return string.Empty;
-        return $"{x.ToString("0.##", CultureInfo.InvariantCulture)} x {y.ToString("0.##", CultureInfo.InvariantCulture)} mm";
-    }
+    private static string FormatDimensions(ExportItem item) =>
+        BomDimensionFormatter.Format(item.FlatPatternXmm, item.FlatPatternYmm, item.Thickness);
 
     private byte[] ReadThumbnail(string documentPath)
     {

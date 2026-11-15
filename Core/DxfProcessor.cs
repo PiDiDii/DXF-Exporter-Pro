@@ -15,6 +15,7 @@ public sealed class DxfProcessor
         ArgumentNullException.ThrowIfNull(options);
         if (!File.Exists(inputPath)) throw new FileNotFoundException("Không tìm thấy DXF đầu vào.", inputPath);
         var lines = File.ReadAllLines(inputPath, DxfEncoding()).ToList();
+        RemoveLayers(lines, options.ExcludedLayers);
         int bends = 0;
         if (options.BendMode == "Chỉ đánh dấu 2 đầu") bends = ConvertBendLinesToEndMarks(lines, options);
         if (options.AddInfoText)
@@ -33,6 +34,7 @@ public sealed class DxfProcessor
         ArgumentNullException.ThrowIfNull(options);
         if (!File.Exists(inputPath)) throw new FileNotFoundException("Không tìm thấy DXF đầu vào.", inputPath);
         var lines = File.ReadAllLines(inputPath, DxfEncoding()).ToList();
+        RemoveLayers(lines, options.ExcludedLayers);
         int bends = options.BendMode == "Chỉ đánh dấu 2 đầu" ? ConvertBendLinesToEndMarks(lines, options) : 0;
         int texts = 0;
         if (options.AddInfoText) { AddInfoTextToDxf(lines, item, options.TextAlignment, options.TextHeight, options.TextLineGap, options.TextYOffset); texts = 4; }
@@ -49,6 +51,192 @@ public sealed class DxfProcessor
     }
 
     public static Encoding DxfEncoding() => Encoding.Latin1;
+
+    public static int RemoveLayers(List<string> lines, IEnumerable<string>? layerNames)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        if (layerNames is null)
+            return 0;
+
+        var excludedLayers = new HashSet<string>(layerNames, StringComparer.OrdinalIgnoreCase);
+        if (excludedLayers.Count == 0)
+            return 0;
+
+        var removedEntities = RemoveEntitiesFromSection(lines, "ENTITIES", excludedLayers)
+            + RemoveEntitiesFromSection(lines, "BLOCKS", excludedLayers);
+        RemoveLayerTableRecords(lines, excludedLayers);
+        return removedEntities;
+    }
+
+    private static int RemoveEntitiesFromSection(
+        List<string> lines,
+        string sectionName,
+        HashSet<string> excludedLayers)
+    {
+        var sectionStart = -1;
+        var sectionEnd = -1;
+        for (var index = 0; index < lines.Count - 3; index += 2)
+        {
+            if (lines[index].Trim() == "0"
+                && lines[index + 1].Trim().Equals("SECTION", StringComparison.OrdinalIgnoreCase)
+                && lines[index + 2].Trim() == "2"
+                && lines[index + 3].Trim().Equals(sectionName, StringComparison.OrdinalIgnoreCase))
+            {
+                sectionStart = index + 4;
+                for (var end = sectionStart; end < lines.Count - 1; end += 2)
+                {
+                    if (lines[end].Trim() == "0"
+                        && lines[end + 1].Trim().Equals("ENDSEC", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sectionEnd = end;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        if (sectionStart < 0 || sectionEnd < 0)
+            return 0;
+
+        var rangesToRemove = new List<(int Start, int Length)>();
+        var entityStart = -1;
+        var entityLayer = string.Empty;
+        for (var index = sectionStart; index <= sectionEnd; index += 2)
+        {
+            var isEntityStart = index < sectionEnd
+                && lines[index].Trim() == "0";
+            if (entityStart >= 0 && (isEntityStart || index == sectionEnd))
+            {
+                if (excludedLayers.Contains(entityLayer))
+                    rangesToRemove.Add((entityStart, index - entityStart));
+                entityStart = -1;
+                entityLayer = string.Empty;
+            }
+
+            if (!isEntityStart)
+                continue;
+
+            entityStart = index;
+            var entityType = lines[index + 1].Trim();
+            if (entityType.Equals("ENDSEC", StringComparison.OrdinalIgnoreCase))
+            {
+                entityStart = -1;
+                break;
+            }
+            if (entityType.Equals("BLOCK", StringComparison.OrdinalIgnoreCase)
+                || entityType.Equals("ENDBLK", StringComparison.OrdinalIgnoreCase))
+            {
+                entityStart = -1;
+                continue;
+            }
+
+            for (var property = index + 2; property < sectionEnd; property += 2)
+            {
+                if (lines[property].Trim() == "0")
+                    break;
+                if (lines[property].Trim() == "8")
+                    entityLayer = lines[property + 1].Trim();
+            }
+        }
+
+        for (var index = rangesToRemove.Count - 1; index >= 0; index--)
+        {
+            var range = rangesToRemove[index];
+            lines.RemoveRange(range.Start, range.Length);
+        }
+
+        return rangesToRemove.Count;
+    }
+
+    private static void RemoveLayerTableRecords(List<string> lines, HashSet<string> excludedLayers)
+    {
+        for (var section = 0; section < lines.Count - 3; section += 2)
+        {
+            if (lines[section].Trim() != "0"
+                || !lines[section + 1].Trim().Equals("SECTION", StringComparison.OrdinalIgnoreCase)
+                || lines[section + 2].Trim() != "2"
+                || !lines[section + 3].Trim().Equals("TABLES", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var sectionEnd = section + 4;
+            while (sectionEnd < lines.Count - 1
+                && !(lines[sectionEnd].Trim() == "0"
+                    && lines[sectionEnd + 1].Trim().Equals("ENDSEC", StringComparison.OrdinalIgnoreCase)))
+                sectionEnd += 2;
+
+            for (var table = section + 4; table < sectionEnd - 3; table += 2)
+            {
+                if (lines[table].Trim() != "0"
+                    || !lines[table + 1].Trim().Equals("TABLE", StringComparison.OrdinalIgnoreCase)
+                    || lines[table + 2].Trim() != "2"
+                    || !lines[table + 3].Trim().Equals("LAYER", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var tableEnd = table + 4;
+                while (tableEnd < sectionEnd - 1
+                    && !(lines[tableEnd].Trim() == "0"
+                        && lines[tableEnd + 1].Trim().Equals("ENDTAB", StringComparison.OrdinalIgnoreCase)))
+                    tableEnd += 2;
+
+                var recordsToRemove = new List<(int Start, int Length)>();
+                var recordStart = -1;
+                var recordName = string.Empty;
+                for (var index = table + 4; index <= tableEnd; index += 2)
+                {
+                    var isRecordStart = index < tableEnd && lines[index].Trim() == "0";
+                    if (recordStart >= 0 && (isRecordStart || index == tableEnd))
+                    {
+                        if (excludedLayers.Contains(recordName))
+                            recordsToRemove.Add((recordStart, index - recordStart));
+                        recordStart = -1;
+                        recordName = string.Empty;
+                    }
+
+                    if (!isRecordStart)
+                        continue;
+
+                    recordStart = index;
+                    if (!lines[index + 1].Trim().Equals("LAYER", StringComparison.OrdinalIgnoreCase))
+                    {
+                        recordStart = -1;
+                        continue;
+                    }
+
+                    for (var property = index + 2; property < tableEnd; property += 2)
+                    {
+                        if (lines[property].Trim() == "0")
+                            break;
+                        if (lines[property].Trim() == "2")
+                            recordName = lines[property + 1].Trim();
+                    }
+                }
+
+                for (var index = recordsToRemove.Count - 1; index >= 0; index--)
+                {
+                    var range = recordsToRemove[index];
+                    lines.RemoveRange(range.Start, range.Length);
+                }
+
+                if (recordsToRemove.Count > 0)
+                    UpdateLayerTableRecordCount(lines, table, tableEnd, recordsToRemove.Count);
+
+                return;
+            }
+        }
+    }
+
+    private static void UpdateLayerTableRecordCount(List<string> lines, int tableStart, int tableEnd, int removedCount)
+    {
+        for (var index = tableStart + 4; index < tableEnd - removedCount * 2; index += 2)
+        {
+            if (lines[index].Trim() != "70")
+                continue;
+            if (int.TryParse(lines[index + 1].Trim(), NumberStyles.Integer, Invariant, out var count))
+                lines[index + 1] = Math.Max(0, count - removedCount).ToString(Invariant);
+            return;
+        }
+    }
 
     public static bool ValidateDxfLines(IList<string> lines)
     {
@@ -223,13 +411,13 @@ public sealed class DxfProcessor
         string decomposed=t.Normalize(NormalizationForm.FormD);var sb=new StringBuilder();foreach(char ch in decomposed)if(CharUnicodeInfo.GetUnicodeCategory(ch)!=UnicodeCategory.NonSpacingMark)sb.Append(ch);
         string output=sb.ToString().Normalize(NormalizationForm.FormC);var ascii=new StringBuilder();foreach(char ch in output)ascii.Append(ch>=32&&ch<=126?ch:'?');return ascii.ToString();
     }
-    private static void WriteAtomically(string path,List<string> lines){string full=Path.GetFullPath(path),dir=Path.GetDirectoryName(full)!;Directory.CreateDirectory(dir);string temp=full+".tmp_"+Guid.NewGuid().ToString("N");try{File.WriteAllLines(temp,lines,DxfEncoding());File.Copy(temp,full,true);}finally{if(File.Exists(temp))File.Delete(temp);}}
+    private static void WriteAtomically(string path,List<string> lines){string full=Path.GetFullPath(path),dir=Path.GetDirectoryName(full)!;Directory.CreateDirectory(dir);string temp=Path.Combine(dir,Path.GetFileName(full)+".tmp_"+Guid.NewGuid().ToString("N"));try{File.WriteAllLines(temp,lines,DxfEncoding());File.Move(temp,full,true);}finally{if(File.Exists(temp))File.Delete(temp);}}
     private sealed class EntityRange{public int Start;public int End;public string Type="";public bool Removed;}
     private sealed class BendGroup{public string Layer="";public double Ux,Uy,D,TMin,TMax;public List<string> Template{get;}=new();}
 }
 
 public sealed record DxfProcessOptions(string DxfOptions, string BendMode, double BendUpLen, double BendUpInset,
     double BendDownLen, double BendDownInset, bool AddInfoText, string TextAlignment, double TextHeight,
-    double TextLineGap, double TextYOffset);
+    double TextLineGap, double TextYOffset, IReadOnlyCollection<string>? ExcludedLayers = null);
 
 public sealed record DxfProcessResult(int BendLinesProcessed, int TextEntitiesAdded, bool Valid);
