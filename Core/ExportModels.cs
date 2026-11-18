@@ -26,7 +26,8 @@ public sealed class ExportSettings
     public double ConvTolerance { get; set; } = 0.01;
     public string ConvLogFolder { get; set; } = string.Empty;
     public bool ConvWriteLog { get; set; } = true;
-    public bool ShowDxfReport { get; set; } = true;
+    public bool WriteDxfReport { get; set; } = true;
+    public string DxfReportFolder { get; set; } = string.Empty;
     public Dictionary<string, string> LayerSettings { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 

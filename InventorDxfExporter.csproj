@@ -40,10 +40,5 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <TargetPath>Doi_K_Factor_Assembly.vb</TargetPath>
     </None>
-    <None Update="Examples\Doi_Ten_Part_Number.iLogicVb">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      <TargetPath>Doi_Ten_Part_Number.iLogicVb</TargetPath>
-    </None>
   </ItemGroup>
 </Project>

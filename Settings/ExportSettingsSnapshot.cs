@@ -26,7 +26,8 @@ internal sealed class ExportSettingsSnapshot
     public double ConvTolerance { get; set; } = 0.01;
     public string ConvLogFolder { get; set; } = string.Empty;
     public bool ConvWriteLog { get; set; } = true;
-    public bool ShowDxfReport { get; set; } = true;
+    public bool WriteDxfReport { get; set; } = true;
+    public string DxfReportFolder { get; set; } = string.Empty;
     public Dictionary<string, string> LayerSettings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public static ExportSettingsSnapshot From(ExportSettings settings) => new()
@@ -53,7 +54,8 @@ internal sealed class ExportSettingsSnapshot
         ConvTolerance = settings.ConvTolerance,
         ConvLogFolder = settings.ConvLogFolder,
         ConvWriteLog = settings.ConvWriteLog,
-        ShowDxfReport = settings.ShowDxfReport,
+        WriteDxfReport = settings.WriteDxfReport,
+        DxfReportFolder = settings.DxfReportFolder,
         LayerSettings = new Dictionary<string, string>(settings.LayerSettings, StringComparer.OrdinalIgnoreCase)
     };
 
@@ -81,7 +83,8 @@ internal sealed class ExportSettingsSnapshot
         settings.ConvTolerance = ConvTolerance;
         settings.ConvLogFolder = ConvLogFolder;
         settings.ConvWriteLog = ConvWriteLog;
-        settings.ShowDxfReport = ShowDxfReport;
+        settings.WriteDxfReport = WriteDxfReport;
+        settings.DxfReportFolder = DxfReportFolder;
         settings.LayerSettings.Clear();
         foreach (var pair in LayerSettings)
             settings.LayerSettings[pair.Key] = pair.Value;

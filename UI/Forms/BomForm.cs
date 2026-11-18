@@ -87,7 +87,7 @@ public sealed class BomForm : Form
             RowCount = 2
         };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 120));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));

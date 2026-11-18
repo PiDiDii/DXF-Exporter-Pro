@@ -1,5 +1,6 @@
 using InventorDxfExporter.Services;
 using InventorDxfExporter.Core;
+using InventorDxfExporter.Commands;
 using InventorDxfExporter.UI.Forms;
 
 namespace InventorDxfExporter.Preview;
@@ -27,6 +28,7 @@ internal sealed class PreviewDashboardForm : Form
             ("Xuất DXF", () => ShowDialog(new DxfExportForm(CreateSettings()))),
             ("Convert STEP", () => ShowDialog(new ConvertStepForm(CreateSettings()))),
             ("Xuất BOM", () => ShowDialog(new BomForm(new BomExportSettings(), _ => { }))),
+            ("Đổi Part Number / Browser Name", () => ShowDialog(InventorPartNumberBrowserRenamer.CreatePreviewForm())),
             ("Danh sách xem trước DXF", () => ShowExportPreview(items)),
             ("Kiểm tra trước khi xuất", () => ShowDialog(new PreflightReviewForm(preflight))),
             ("Tiến trình thao tác", ShowProgressPreview)

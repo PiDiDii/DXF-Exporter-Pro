@@ -6,13 +6,16 @@ namespace InventorDxfExporter.UI.Forms;
 public sealed class DxfExportForm : Form
 {
     private readonly TextBox _output = new() { Dock = DockStyle.Fill };
+    private readonly TextBox _reportDirectory = new() { Dock = DockStyle.Fill };
     private readonly ComboBox _overwrite = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _fast = new() { Text = "Tắt cập nhật giao diện khi xuất", AutoSize = true };
     private readonly CheckBox _cleanup = new() { Text = "Xóa DXF cũ của Part đang Suppress", AutoSize = true };
     private readonly CheckBox _exportBom = new() { Text = "Xuất thêm BOM sau khi xuất DXF", AutoSize = true };
-    private readonly CheckBox _showReport = new() { Text = "Hiện báo cáo sau khi xuất DXF", AutoSize = true };
+    private readonly CheckBox _writeReport = new() { Text = "Xuất file báo cáo .txt sau khi xuất DXF", AutoSize = true };
     private readonly Button _settings = UiStyles.CreateButton("Cài đặt");
     private readonly ToolTip _toolTips = new();
+    private bool _reportFolderFollowsOutput;
+    private bool _updatingReportDirectory;
 
     public DxfExportForm(ExportSettings settings)
     {
@@ -27,21 +30,42 @@ public sealed class DxfExportForm : Form
 
         _output.Text = settings.OutputRoot;
         _output.PlaceholderText = "Chọn thư mục lưu DXF";
+        _reportFolderFollowsOutput = string.IsNullOrWhiteSpace(settings.DxfReportFolder);
+        _reportDirectory.Text = _reportFolderFollowsOutput ? settings.OutputRoot : settings.DxfReportFolder;
+        _reportDirectory.PlaceholderText = "Để trống để dùng thư mục xuất DXF";
         _fast.Checked = settings.FastMode;
         _cleanup.Checked = settings.CleanupSuppressed;
         _exportBom.Checked = settings.ExportBomAfterDxf;
-        _showReport.Checked = settings.ShowDxfReport;
+        _writeReport.Checked = settings.WriteDxfReport;
         _toolTips.SetToolTip(_cleanup,
             "Xóa các file DXF cũ đã xuất cho các Part đang bị Suppress trong assembly khỏi thư mục xuất. " +
             "Không xóa Part hoặc Assembly trong Inventor. Khi tắt, các file DXF cũ được giữ lại và ghi cảnh báo trong báo cáo.");
-        _toolTips.SetToolTip(_showReport,
-            "Khi tắt, ẩn báo cáo tổng kết nếu không có lỗi. Các lỗi xuất vẫn luôn được thông báo.");
+        _toolTips.SetToolTip(_writeReport, "Ghi báo cáo chi tiết dạng .txt sau mỗi lần chạy xuất DXF.");
+        _toolTips.SetToolTip(_reportDirectory, "Thư mục lưu báo cáo .txt. Mặc định dùng thư mục xuất DXF.");
         _overwrite.Items.AddRange(new object[] { "Hỏi trước khi ghi đè", "Ghi đè tự động", "Bỏ qua file đã có" });
         _overwrite.SelectedIndex = settings.OverwriteMode switch
         {
             "Ghi đè tự động" => 1,
             "Bỏ qua file đã có" => 2,
             _ => 0
+        };
+        var reportBrowse = UiStyles.CreateFolderPicker(this, _reportDirectory, "Duyệt", "Chọn thư mục lưu báo cáo DXF");
+        reportBrowse.Enabled = _writeReport.Checked;
+        _reportDirectory.Enabled = _writeReport.Checked;
+        _writeReport.CheckedChanged += (_, _) =>
+        {
+            _reportDirectory.Enabled = _writeReport.Checked;
+            reportBrowse.Enabled = _writeReport.Checked;
+        };
+        _reportDirectory.TextChanged += (_, _) =>
+        {
+            if (!_updatingReportDirectory)
+                _reportFolderFollowsOutput = false;
+        };
+        _output.TextChanged += (_, _) =>
+        {
+            if (_reportFolderFollowsOutput)
+                SetReportDirectory(_output.Text);
         };
 
         var root = new TableLayoutPanel
@@ -64,11 +88,11 @@ public sealed class DxfExportForm : Form
             ColumnCount = 1,
             RowCount = 2
         };
-        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 142));
+        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 188));
         content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var outputSection = UiStyles.CreateSection("Nơi lưu và file trùng");
-        var outputGrid = UiStyles.CreateFieldGrid(2);
+        var outputGrid = UiStyles.CreateFieldGrid(3);
         outputGrid.Controls.Add(UiStyles.CreateFieldLabel("Thư mục xuất"), 0, 0);
         outputGrid.Controls.Add(_output, 1, 0);
         var browse = UiStyles.CreateFolderPicker(this, _output, "Duyệt", "Chọn thư mục cha để xuất DXF");
@@ -76,6 +100,9 @@ public sealed class DxfExportForm : Form
         outputGrid.Controls.Add(UiStyles.CreateFieldLabel("Nếu file đã tồn tại"), 0, 1);
         outputGrid.Controls.Add(_overwrite, 1, 1);
         outputGrid.SetColumnSpan(_overwrite, 2);
+        outputGrid.Controls.Add(UiStyles.CreateFieldLabel("Thư mục báo cáo .txt"), 0, 2);
+        outputGrid.Controls.Add(_reportDirectory, 1, 2);
+        outputGrid.Controls.Add(reportBrowse, 2, 2);
         outputSection.Controls.Add(outputGrid);
 
         var optionsSection = UiStyles.CreateSection("Tùy chọn");
@@ -89,7 +116,7 @@ public sealed class DxfExportForm : Form
         for (var index = 0; index < 4; index++)
             options.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
         options.Controls.Add(_exportBom, 0, 0);
-        options.Controls.Add(_showReport, 0, 1);
+        options.Controls.Add(_writeReport, 0, 1);
         options.Controls.Add(_fast, 0, 2);
         options.Controls.Add(_cleanup, 0, 3);
         optionsSection.Controls.Add(options);
@@ -134,7 +161,17 @@ public sealed class DxfExportForm : Form
         settings.FastMode = _fast.Checked;
         settings.CleanupSuppressed = _cleanup.Checked;
         settings.ExportBomAfterDxf = _exportBom.Checked;
-        settings.ShowDxfReport = _showReport.Checked;
+        settings.WriteDxfReport = _writeReport.Checked;
+        settings.DxfReportFolder = _reportFolderFollowsOutput
+            ? string.Empty
+            : _reportDirectory.Text.Trim();
+    }
+
+    private void SetReportDirectory(string value)
+    {
+        _updatingReportDirectory = true;
+        try { _reportDirectory.Text = value; }
+        finally { _updatingReportDirectory = false; }
     }
 
     protected override void Dispose(bool disposing)

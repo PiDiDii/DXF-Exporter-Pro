@@ -11,15 +11,16 @@ UI/Forms/   Giao diện Convert, DXF, BOM, Settings, preview và progress
 Commands/   Lệnh Ribbon theo ngữ cảnh Assembly/Part
 Settings/   Cài đặt JSON, profile dự án/khách hàng và cấu hình BOM
 Tests/      Kiểm tra cấu trúc DXF, cài đặt và BOM không cần Inventor
-Examples/   Nguồn hai external iLogic rule được đóng gói cùng add-in
+Examples/   Công cụ C# đổi Part Number/Browser Name và rule iLogic K-Factor
 ```
 
 ## Chức năng
 
-- Ribbon cho Convert STEP (Assembly), Xuất DXF và Xuất BOM (Part/Assembly); thêm Đổi hệ số K và Đổi Part Number (Assembly).
-- Hai lệnh iLogic dùng lại các rule trong `Examples/`; MSI cài rule cạnh DLL add-in. Cần có iLogic đi kèm Inventor và bật được add-in iLogic. Đổi Part Number tạo file CSV sao lưu và chưa tự lưu các tài liệu đã sửa; lệnh Đổi hệ số K mặc định tự lưu từng part theo tùy chọn trong form.
+- Ribbon cho Convert STEP (Assembly), Xuất DXF và Xuất BOM (Part/Assembly); thêm Đổi hệ số K bằng iLogic và công cụ C# Đổi Part Number/Browser Name (Assembly).
+- Công cụ C# cho xem trước, đánh số theo phân cấp và chọn đổi Browser Name occurrence hoặc iProperty Part Number; không đổi tên file và không tự lưu tài liệu. Lệnh Đổi hệ số K vẫn chạy rule iLogic được đóng gói cạnh DLL và mặc định tự lưu từng part theo tùy chọn trong form.
+- Dashboard Preview có màn hình Part Number/Browser Name với dữ liệu mẫu, không kết nối Inventor và không thực hiện thay đổi; form khôi phục số lượng, sơ đồ mã, tùy chọn thư viện, trạng thái/bỏ qua và log/sao lưu CSV. Không có phần xem 3D.
 - Convert STEP sang Sheet Metal, xác định độ dày, tùy chọn gán A-Side vào mặt trong, tạo Flat Pattern; có lọc tên, hai chế độ Thickness, bỏ qua Flat Pattern sẵn có, tolerance, log và hủy tiến trình.
-- Xuất DXF từ Flat Pattern, kiểm tra trước khi xuất, preview và chọn từng part; nút Cài đặt nằm ngay cửa sổ xuất đầu tiên. Cấu hình layer, bend marks, TEXT, overwrite/skip, FastMode, dọn DXF của part suppressed và bật/tắt báo cáo tổng kết sau xuất (lỗi vẫn luôn được báo).
+- Xuất DXF từ Flat Pattern, kiểm tra trước khi xuất, preview và chọn từng part; nút Cài đặt nằm ngay cửa sổ xuất đầu tiên. Cấu hình layer, bend marks, TEXT, overwrite/skip, FastMode, dọn DXF của part suppressed và bật/tắt file báo cáo `.txt` sau xuất với thư mục lưu riêng.
 - Tùy chọn layer `IV_MARK_SURFACE` (mặc định tắt); khi tắt Tool Center, cả tên `IV_TOOL_CENTER` và biến thể `IV_Tool_center` đều được đưa vào danh sách ẩn.
 - Xuất BOM sau DXF là tùy chọn, mặc định tắt. Lệnh Xuất DXF không cập nhật Description/Thickness và không lưu part nguồn.
 - Xuất BOM vào bản sao workbook `.xlsx` mẫu bằng ClosedXML, không cần Microsoft Excel; có xem trước danh sách Part Number/vật liệu/số lượng/kích thước trước khi xuất, tiến trình/hủy, định dạng kích thước `dài x rộng x độ dày` với dấu phẩy thập phân, và tùy chọn ghi Ngày (`dd/MM/yyyy`) cùng Tên dự án vào các ô tiêu đề đã cấu hình. Tên dự án lấy từ tên file tài liệu, không gồm phần mở rộng.
@@ -29,7 +30,7 @@ Examples/   Nguồn hai external iLogic rule được đóng gói cùng add-in
 ## Trạng thái kiểm thử
 
 - Build add-in, build UI Preview, bộ validation DXF/BOM và build MSI đã chạy thành công sau các thay đổi hiện tại, đều 0 cảnh báo/0 lỗi. Các kết quả này không thay thế kiểm thử host Inventor hoặc kiểm tra cài đặt.
-- Hai lệnh iLogic mới đã build thành công; hai rule được copy cạnh DLL trong thư mục output. Bộ validation DXF/BOM đã chạy qua. Chưa chạy hai rule bên trong Inventor 2027.
+- Lệnh iLogic K-Factor và công cụ C# Part Number/Browser Name đã build thành công. Bộ validation DXF/BOM đã chạy qua. Chưa chạy các lệnh trong Inventor 2027.
 - Người dùng xác nhận phiên bản trước đã được nạp và chạy thử thành công trong Inventor 2027. Nhóm thay đổi DXF/BOM/Convert STEP hiện tại vẫn cần kiểm tra thủ công trên Inventor 2027.
 - MSI của mã nguồn hiện tại đã được tạo thành công. WiX cấu hình không nâng cấp cùng phiên bản; ICE91 được suppress có chủ đích cho gói cài per-user. Chưa thực hiện cài/nâng cấp/gỡ MSI trên máy thử sạch trong lần xác minh này.
 - Cài đặt JSON đã qua kiểm tra tự động; cần xác nhận thêm việc đọc/ghi cấu hình khi nạp add-in trong Inventor sau thay đổi này.

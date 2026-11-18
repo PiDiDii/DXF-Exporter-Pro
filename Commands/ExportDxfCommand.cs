@@ -101,8 +101,7 @@ public sealed class ExportDxfCommand
         }
         var summary = string.Join(IOEnvironment.NewLine, result.Messages);
         if (string.IsNullOrWhiteSpace(summary)) summary = $"Đã xuất: {result.Success}; bỏ qua: {result.Skipped}; lỗi: {result.Errors}.";
-        if (settings.ShowDxfReport || result.Errors > 0)
-            MessageBox.Show(owner, summary, "Kết quả Xuất DXF", MessageBoxButtons.OK,
-                result.Errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+        MessageBox.Show(owner, summary, "Kết quả Xuất DXF", MessageBoxButtons.OK,
+            result.Errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
     }
 }

@@ -31,7 +31,6 @@ public sealed class RibbonCommandSet
         var export = new ExportDxfCommand(_application);
         var bom = new ExportBomCommand(_application);
         var changeKFactor = new RunILogicRuleCommand(_application, "Doi_K_Factor_Assembly.vb");
-        var changePartNumber = new RunILogicRuleCommand(_application, "Doi_Ten_Part_Number.iLogicVb");
 
         var convertButton = Define("Convert STEP", "ConvertStep",
             "Chuyển các part STEP trong Assembly thành Sheet Metal và tạo Flat Pattern.", "Convert STEP", IconKind.Convert,
@@ -47,7 +46,8 @@ public sealed class RibbonCommandSet
         var kFactorButton = Define("Đổi hệ số K", "ChangeKFactor",
             "Đổi hệ số K cho các chi tiết Sheet Metal được chọn trong Assembly.", "Đổi hệ số K", IconKind.KFactor, changeKFactor.Execute);
         var partNumberButton = Define("Đổi Part Number", "ChangePartNumber",
-            "Đánh số Part Number theo cấp lắp ráp và xem trước thay đổi.", "Đổi Part Number", IconKind.PartNumber, changePartNumber.Execute);
+            "Đổi Part Number hoặc Browser Name theo cấp lắp ráp; xem trước trước khi áp dụng.",
+            "Đổi Part Number", IconKind.PartNumber, () => InventorPartNumberBrowserRenamer.Show(_application));
 
         _userInterfaceEvents = (UserInterfaceEventsSink_Event)_application.UserInterfaceManager.UserInterfaceEvents;
         _resetRibbonHandler = OnResetRibbonInterface;

@@ -180,7 +180,8 @@ try
     exportSettings.ConvMode = 1;
     exportSettings.ConvWriteLog = false;
     exportSettings.ConvAssignInnerFaceAsASide = false;
-    exportSettings.ShowDxfReport = false;
+    exportSettings.WriteDxfReport = false;
+    exportSettings.DxfReportFolder = Path.Combine(tempDirectory, "reports");
     exportSettings.LayerSettings["IV_BEND_UP"] = "True";
     exportSettings.LayerSettings["IV_MARK_SURFACE"] = "True";
     exportSettingsStore.Save(exportSettings);
@@ -188,7 +189,9 @@ try
     Require(!reloadedSettings.ExportBomAfterDxf
         && reloadedSettings.ConvFilter == "BRACKET" && reloadedSettings.ConvMode == 1
         && !reloadedSettings.ConvWriteLog && !reloadedSettings.ConvAssignInnerFaceAsASide
-        && !reloadedSettings.ShowDxfReport && reloadedSettings.LayerSettings["iv_bend_up"] == "True"
+        && !reloadedSettings.WriteDxfReport
+        && reloadedSettings.DxfReportFolder == Path.Combine(tempDirectory, "reports")
+        && reloadedSettings.LayerSettings["iv_bend_up"] == "True"
         && reloadedSettings.LayerSettings["iv_mark_surface"] == "True",
         "Application settings were not persisted in the current JSON format.");
     var legacySettingsPath = Path.Combine(tempDirectory, "legacy-ExportSettings.json");
@@ -196,7 +199,8 @@ try
     var legacySettings = new ExportSettingsStore(legacySettingsPath).Load();
     Require(legacySettings.ConvWriteLog
         && legacySettings.ConvAssignInnerFaceAsASide
-        && legacySettings.ShowDxfReport,
+        && legacySettings.WriteDxfReport
+        && string.IsNullOrEmpty(legacySettings.DxfReportFolder),
         "Existing settings without new toggle options must retain their previous enabled behavior.");
 
     var profileDirectory = Path.Combine(tempDirectory, "profiles");
@@ -206,14 +210,16 @@ try
     {
         ExportBomAfterDxf = false,
         ConvAssignInnerFaceAsASide = false,
-        ShowDxfReport = false
+        WriteDxfReport = false,
+        DxfReportFolder = Path.Combine(tempDirectory, "profile-reports")
     };
     profileStore.Save("separated", profileSettings);
     var reloadedProfile = new ExportSettings();
     Require(profileStore.TryLoad("separated", reloadedProfile)
         && !reloadedProfile.ExportBomAfterDxf
         && !reloadedProfile.ConvAssignInnerFaceAsASide
-        && !reloadedProfile.ShowDxfReport,
+        && !reloadedProfile.WriteDxfReport
+        && reloadedProfile.DxfReportFolder == Path.Combine(tempDirectory, "profile-reports"),
         "A profile did not preserve the independent options.");
 
     var templatePath = Path.Combine(tempDirectory, "template.xlsx");

@@ -128,6 +128,25 @@ The export list reports “Chưa có Flat Pattern” when a part has no existing
 | `IiLogicAutomation.RunExternalRule` | Installed Autodesk Inventor 2027 `Autodesk.iLogic.Interfaces.xml` topic `M:Autodesk.iLogic.Interfaces.IiLogicAutomation.RunExternalRule(Inventor.Document,System.String)` and reflection on `Autodesk.iLogic.Interfaces.dll` | `int RunExternalRule(Inventor.Document, System.String)`; zero means success; accepts a rule filename with a valid extension and absolute path. Add-in build compiled the new command against the installed 2027 interface assembly. | Verified from Inventor 2027 Reference; Compile Verified |
 | `ApplicationAddIns` / `ApplicationAddIn` | Installed `Autodesk.Inventor.Interop.dll`, version `31.10.26700.0`, inspected by reflection | `ApplicationAddIns.Count`, `Item[int]`, and `ApplicationAddIn.DisplayName`, `ShortDisplayName`, `Description`, `Activated`, `Automation`, and `Activate()` are present and used to find/activate iLogic. Add-in build compiled the discovery and activation code. | Verified from Inventor 2027 Reference; Compile Verified |
 
+## Part Number / Browser Name command integration
+
+| API / topic | Inventor 2027 evidence | Result | Status |
+|---|---|---|---|
+| `ComponentOccurrence.Name` | Autodesk Inventor 2027 API Help, [`ComponentOccurrence.Name`](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-API/files/ComponentOccurrence_Name.htm), plus installed interop XML topic `P:Inventor.ComponentOccurrence.Name` | Read/write string property used to preview and update the browser label while preserving the occurrence suffix. | Verified from Inventor 2027 Reference; Compile Verified |
+| `Document.PropertySets` / `Property.Value` | Autodesk Inventor 2027 API Help, [`Document.PropertySets`](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-API/files/Document_PropertySets.htm) and [`Property.Value`](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-API/files/Property_Value.htm); installed interop reflection/XML | `Document.PropertySets` returns `PropertySets`; the Design Tracking Properties and Part Number items return a `Property`; `Property.Value` is `object` and read/write. | Verified from Inventor 2027 Reference; Compile Verified |
+| `Document.FullDocumentName`, `Document.SubType`, `ComponentOccurrence.Definition` / `SubOccurrences`, `ComponentOccurrencesEnumerator.Count` / `Item` | Installed Inventor 2027 `Autodesk.Inventor.Interop.xml` and reflection on interop version `31.10.26700.0` | Used to deduplicate documents, identify sheet-metal subtype, and recursively traverse unsuppressed assembly occurrences in stable browser order. | Verified from Inventor 2027 Reference; Compile Verified |
+| `DesignProject.LibraryPaths` / `ProjectPaths` / `ProjectPath.Path` / `DesignProject.ContentCenterPath` | Installed Inventor 2027 `Autodesk.Inventor.Interop.xml` topics `P:Inventor.DesignProject.LibraryPaths`, `P:Inventor.ProjectPaths.Count`, `P:Inventor.ProjectPaths.Item`, `P:Inventor.ProjectPath.Path`, and `P:Inventor.DesignProject.ContentCenterPath` | `ProjectPaths` is read by its 1-based `Count`/`Item` collection; each `ProjectPath.Path` and the Content Center path are normalized and compared to component document paths. | Verified from Inventor 2027 Reference; Compile Verified |
+| `PartComponentDefinition.IsiPartMember` / `IsiPartFactory` / `IsContentMember`; `AssemblyComponentDefinition.IsiAssemblyMember` / `IsiAssemblyFactory` / `IsContentMember` | Installed Inventor 2027 `Autodesk.Inventor.Interop.xml` topics for the named properties | Boolean properties used to exclude iPart/iAssembly factories and members, and identify Content Center parts/assemblies. | Verified from Inventor 2027 Reference; Compile Verified |
+| Modeless WinForms owner (`Application.MainFrameHWND`) | Installed Inventor 2027 interop metadata; add-in build | The Part Number form is shown modeless with an `IWin32Window` owner wrapping Inventor's main frame handle; the preview form supplies sample data and never accesses Inventor COM. | Verified from Inventor 2027 Reference; Compile Verified; not Inventor Runtime Tested |
+
+Build command:
+
+```powershell
+dotnet build .\InventorDxfExporter.csproj --no-restore
+```
+
+Result: **Build succeeded; 0 warnings, 0 errors.** The command has not been loaded or runtime-tested in Inventor 2027. The 3D document-open/view workflow was intentionally removed; the grid now shows text and status only.
+
 ## Evidence record template
 
 ```text

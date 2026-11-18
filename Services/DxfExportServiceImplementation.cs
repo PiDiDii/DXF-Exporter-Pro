@@ -184,23 +184,36 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
             }
 
             totalTimer.Stop();
-            var report = new StringBuilder();
-            report.AppendLine("HOÀN TẤT XUẤT DXF");
-            report.AppendLine("Thời gian (giây): Tổng " + Seconds(totalTimer) + " | Xuất DXF (Unfold+DataIO) " + Seconds(dxfTimer) +
-                " | Xử lý file DXF " + Seconds(postTimer) + " | BOM " + Seconds(bomTimer));
-            report.AppendLine("Part duy nhất: " + items.Count); report.AppendLine("Đã xuất: " + exported); report.AppendLine("Bỏ qua file đã có: " + skippedExisting);
-            report.AppendLine("Bỏ qua khi duyệt: " + skipped.Count); if (settings.BendMode == "Chỉ đánh dấu 2 đầu") report.AppendLine("Đường chấn đã đánh dấu: " + bendCount);
-            report.AppendLine("Lỗi: " + errors.Count); report.AppendLine("File suppressed đã xóa: " + deletedSuppressed);
-            if (!string.IsNullOrEmpty(bomPath)) report.AppendLine("BOM: " + bomPath);
-            if (skipped.Count > 0) { report.AppendLine("\nBỎ QUA:"); foreach (var line in skipped) report.AppendLine(line); }
-            if (errors.Count > 0) { report.AppendLine("\nLỖI:"); foreach (var line in errors) report.AppendLine(line); }
-            report.AppendLine(); report.Append(outputLines);
-            reportPath = IOPath.Combine(settings.OutputRoot,
-                "BaoCao_Export_DXF_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture) + ".txt");
-            IOFile.WriteAllText(reportPath, report.ToString(), new UTF8Encoding(true));
+            if (settings.WriteDxfReport)
+            {
+                var report = new StringBuilder();
+                report.AppendLine("HOÀN TẤT XUẤT DXF");
+                report.AppendLine("Thời gian (giây): Tổng " + Seconds(totalTimer) + " | Xuất DXF (Unfold+DataIO) " + Seconds(dxfTimer) +
+                    " | Xử lý file DXF " + Seconds(postTimer) + " | BOM " + Seconds(bomTimer));
+                report.AppendLine("Part duy nhất: " + items.Count); report.AppendLine("Đã xuất: " + exported); report.AppendLine("Bỏ qua file đã có: " + skippedExisting);
+                report.AppendLine("Bỏ qua khi duyệt: " + skipped.Count); if (settings.BendMode == "Chỉ đánh dấu 2 đầu") report.AppendLine("Đường chấn đã đánh dấu: " + bendCount);
+                report.AppendLine("Lỗi: " + errors.Count); report.AppendLine("File suppressed đã xóa: " + deletedSuppressed);
+                if (!string.IsNullOrEmpty(bomPath)) report.AppendLine("BOM: " + bomPath);
+                if (skipped.Count > 0) { report.AppendLine("\nBỎ QUA:"); foreach (var line in skipped) report.AppendLine(line); }
+                if (errors.Count > 0) { report.AppendLine("\nLỖI:"); foreach (var line in errors) report.AppendLine(line); }
+                report.AppendLine(); report.Append(outputLines);
+                var reportFolder = string.IsNullOrWhiteSpace(settings.DxfReportFolder)
+                    ? settings.OutputRoot
+                    : settings.DxfReportFolder;
+                Directory.CreateDirectory(reportFolder);
+                reportPath = IOPath.Combine(reportFolder,
+                    "BaoCao_Export_DXF_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture) + ".txt");
+                IOFile.WriteAllText(reportPath, report.ToString(), new UTF8Encoding(true));
+            }
             monitor.Report(new OperationProgress(items.Count, items.Count, reportPath, "Hoàn tất"));
-            return new OperationResult(exported, skipped.Count + skippedExisting, errors.Count, reportPath,
-                new[] { $"Part duy nhất: {items.Count}; đã xuất: {exported}; bỏ qua: {skipped.Count + skippedExisting}; lỗi: {errors.Count}.", "Báo cáo: " + reportPath }.Concat(errors).ToArray());
+            var messages = new List<string>
+            {
+                $"Part duy nhất: {items.Count}; đã xuất: {exported}; bỏ qua: {skipped.Count + skippedExisting}; lỗi: {errors.Count}."
+            };
+            if (!string.IsNullOrWhiteSpace(reportPath))
+                messages.Add("Báo cáo: " + reportPath);
+            messages.AddRange(errors);
+            return new OperationResult(exported, skipped.Count + skippedExisting, errors.Count, reportPath, messages);
         }
         catch (OperationCanceledException)
         {
