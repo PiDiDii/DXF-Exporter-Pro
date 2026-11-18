@@ -121,6 +121,13 @@ The export list reports “Chưa có Flat Pattern” when a part has no existing
 | BOM/DXF validation | `dotnet run --project .\Tests\DxfProcessorValidation\DxfProcessorValidation.csproj` | Passed, including workbook picture embedding and migration of legacy image settings |
 | Inventor runtime | Not run inside Inventor 2027 | Unverified; confirm thumbnail availability and appearance in the host, especially for unsaved or thumbnail-less parts |
 
+## External iLogic command integration
+
+| API / topic | Inventor 2027 evidence | Result | Status |
+|---|---|---|---|
+| `IiLogicAutomation.RunExternalRule` | Installed Autodesk Inventor 2027 `Autodesk.iLogic.Interfaces.xml` topic `M:Autodesk.iLogic.Interfaces.IiLogicAutomation.RunExternalRule(Inventor.Document,System.String)` and reflection on `Autodesk.iLogic.Interfaces.dll` | `int RunExternalRule(Inventor.Document, System.String)`; zero means success; accepts a rule filename with a valid extension and absolute path. Add-in build compiled the new command against the installed 2027 interface assembly. | Verified from Inventor 2027 Reference; Compile Verified |
+| `ApplicationAddIns` / `ApplicationAddIn` | Installed `Autodesk.Inventor.Interop.dll`, version `31.10.26700.0`, inspected by reflection | `ApplicationAddIns.Count`, `Item[int]`, and `ApplicationAddIn.DisplayName`, `ShortDisplayName`, `Description`, `Activated`, `Automation`, and `Activate()` are present and used to find/activate iLogic. Add-in build compiled the discovery and activation code. | Verified from Inventor 2027 Reference; Compile Verified |
+
 ## Evidence record template
 
 ```text

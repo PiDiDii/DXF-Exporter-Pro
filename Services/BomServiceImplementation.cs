@@ -65,7 +65,7 @@ public sealed class BomServiceImplementation : IBomService
 
                 rows.Add(new BomTemplateRow(
                     number++,
-                    item.DetailName,
+                    item.PartNumber ?? item.DetailName,
                     dimensions,
                     item.Material,
                     item.Quantity,

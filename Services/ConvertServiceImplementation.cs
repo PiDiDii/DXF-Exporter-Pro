@@ -33,6 +33,7 @@ public sealed class ConvertServiceImplementation : IConvertService
 
         var filterText = (settings.ConvFilter ?? string.Empty).Trim().ToUpperInvariant();
         var skipExisting = settings.ConvSkipExisting;
+        var assignInnerFaceAsASide = settings.ConvAssignInnerFaceAsASide;
         var conversionMode = settings.ConvMode;
         var toleranceMm = settings.ConvTolerance;
         if (toleranceMm <= 0) toleranceMm = 0.01;
@@ -61,6 +62,7 @@ public sealed class ConvertServiceImplementation : IConvertService
         log.AppendLine("SM BATCH CONVERTER - Inventor 2027");
         log.AppendLine("Chế độ    : " + (conversionMode == 1 ? "1 - Tự phát hiện độ dày, điền thủ công" : "2 - Tự phát hiện độ dày, khớp Sheet Metal Rule"));
         log.AppendLine("Dung sai  : ±" + toleranceMm.ToString("0.000", CultureInfo.InvariantCulture) + " mm");
+        log.AppendLine("Gán A-Side mặt trong: " + (assignInnerFaceAsASide ? "Có" : "Không"));
         log.AppendLine("Thời gian : " + DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture));
         log.AppendLine("Assembly  : " + assembly.DisplayName);
         log.AppendLine("Lọc       : " + (filterText.Length == 0 ? "(Tất cả)" : filterText));
@@ -131,20 +133,23 @@ public sealed class ConvertServiceImplementation : IConvertService
                         log.AppendLine("    Áp Sheet Metal Rule: " + matchedRule.Name + " (Thickness rule = " + (SafeThicknessToCm(matchedRule.Thickness) * 10).ToString("0.000", CultureInfo.InvariantCulture) + " mm)");
                     }
 
-                    // Thickness/style changes rebuild the solid; reacquire the face before assigning A-side.
                     part.Update();
-                    Face? innerFace = null;
-                    GetInnerFaceAndThickness(smDef, ref innerFace);
-                    if (innerFace is null) throw new InvalidOperationException("Không xác định lại được mặt trong sau khi đổi Thickness");
-                    try
+                    if (assignInnerFaceAsASide)
                     {
-                        smDef.ASideFace = innerFace;
-                        log.AppendLine("    Đã gán A-Side = mặt trong");
+                        Face? innerFace = null;
+                        GetInnerFaceAndThickness(smDef, ref innerFace);
+                        if (innerFace is null) throw new InvalidOperationException("Không xác định lại được mặt trong sau khi đổi Thickness");
+                        try
+                        {
+                            smDef.ASideFace = innerFace;
+                            log.AppendLine("    Đã gán A-Side = mặt trong");
+                        }
+                        catch
+                        {
+                            log.AppendLine("    Cảnh báo: Không gán được ASideFace");
+                        }
                     }
-                    catch
-                    {
-                        log.AppendLine("    Cảnh báo: Không gán được ASideFace");
-                    }
+                    else log.AppendLine("    Bỏ qua gán A-Side theo tùy chọn");
 
                     try
                     {

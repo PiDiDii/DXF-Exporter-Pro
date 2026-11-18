@@ -1,4 +1,5 @@
 using Inventor;
+using InventorDxfExporter.Core;
 using InventorDxfExporter.Services;
 using InventorDxfExporter.Settings;
 using InventorDxfExporter.UI.Forms;
@@ -24,7 +25,34 @@ public sealed class ExportBomCommand
         }
         var bomSettingsStore = new BomExportSettingsStore();
         var bomSettings = bomSettingsStore.Load();
+        IReadOnlyList<ExportItem>? items = null;
         using var form = new BomForm(bomSettings, bomSettingsStore.Save);
+        form.PreviewRequested += (_, _) =>
+        {
+            try
+            {
+                items ??= CollectItems(document, form);
+                if (items.Count == 0)
+                {
+                    MessageBox.Show(form, "Không tìm thấy part Sheet Metal hợp lệ để lập BOM.", "Xem trước BOM",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                using var preview = new BomPreviewForm(items);
+                preview.ShowDialog(form);
+            }
+            catch (OperationCanceledException)
+            {
+                MessageBox.Show(form, "Đã hủy thu thập danh sách BOM.", "Xem trước BOM",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(form, "Không thể xem trước BOM: " + ex.Message, "Xem trước BOM",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        };
         if (form.ShowDialog(owner) != DialogResult.OK) return;
         bomSettingsStore.Save(bomSettings);
         string path;
@@ -34,7 +62,7 @@ public sealed class ExportBomCommand
             progress.Refresh();
             try
             {
-                var items = _services.DxfExport.CollectItems(document, progress);
+                items ??= _services.DxfExport.CollectItems(document, progress);
                 if (items.Count == 0)
                 {
                     progress.MarkCompleted();
@@ -67,5 +95,27 @@ public sealed class ExportBomCommand
         if (_services.Bom.Errors.Count > 0) summary += "\n\nLỗi:\n" + string.Join("\n", _services.Bom.Errors);
         MessageBox.Show(owner, summary, "Kết quả Xuất BOM", MessageBoxButtons.OK,
             _services.Bom.Errors.Count > 0 || string.IsNullOrWhiteSpace(path) ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+    }
+
+    private IReadOnlyList<ExportItem> CollectItems(Document document, IWin32Window owner)
+    {
+        using var progress = new OperationProgressForm("Chuẩn bị xem trước BOM", owner);
+        progress.Show(owner);
+        progress.Refresh();
+        try
+        {
+            var items = _services.DxfExport.CollectItems(document, progress);
+            progress.MarkCompleted();
+            return items;
+        }
+        catch (OperationCanceledException)
+        {
+            progress.MarkCanceled();
+            throw;
+        }
+        finally
+        {
+            progress.Close();
+        }
     }
 }

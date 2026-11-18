@@ -17,6 +17,7 @@ public sealed class ConvertStepForm : Form
         AutoSize = true
     };
     private readonly CheckBox _skip = new() { Text = "Bỏ qua Part đã có Flat Pattern", AutoSize = true };
+    private readonly CheckBox _assignInnerFaceAsASide = new() { Text = "Gán A-Side vào mặt trong", AutoSize = true };
     private readonly NumericUpDown _tolerance = new()
     {
         DecimalPlaces = 3,
@@ -37,12 +38,13 @@ public sealed class ConvertStepForm : Form
         FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox = false;
         MaximizeBox = false;
-        ClientSize = new System.Drawing.Size(720, 600);
-        MinimumSize = new System.Drawing.Size(620, 420);
+        ClientSize = new System.Drawing.Size(720, 650);
+        MinimumSize = new System.Drawing.Size(620, 470);
 
         _filter.Text = settings.ConvFilter;
         _filter.PlaceholderText = "Để trống để xử lý tất cả Part STEP";
         _skip.Checked = settings.ConvSkipExisting;
+        _assignInnerFaceAsASide.Checked = settings.ConvAssignInnerFaceAsASide;
         _tolerance.Value = Math.Clamp((decimal)settings.ConvTolerance, _tolerance.Minimum, _tolerance.Maximum);
         _logFolder.Text = settings.ConvLogFolder;
         _logFolder.PlaceholderText = "Chọn nơi lưu nhật ký chuyển đổi";
@@ -71,7 +73,7 @@ public sealed class ConvertStepForm : Form
             RowCount = 3
         };
         content.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
-        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 170));
+        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 200));
         content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var filterSection = UiStyles.CreateSection("Phạm vi");
@@ -86,8 +88,9 @@ public sealed class ConvertStepForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(12, 4, 8, 8),
             ColumnCount = 1,
-            RowCount = 3
+            RowCount = 4
         };
+        modeLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         modeLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         modeLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         modeLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
@@ -104,6 +107,7 @@ public sealed class ConvertStepForm : Form
         _tolerance.Margin = new Padding(12, 0, 0, 0);
         toleranceRow.Controls.Add(_tolerance);
         modeLayout.Controls.Add(toleranceRow, 0, 2);
+        modeLayout.Controls.Add(_assignInnerFaceAsASide, 0, 3);
         modeSection.Controls.Add(modeLayout);
 
         var outputSection = UiStyles.CreateSection("Kết quả và nhật ký");
@@ -138,6 +142,7 @@ public sealed class ConvertStepForm : Form
         settings.ConvFilter = _filter.Text.Trim();
         settings.ConvMode = _detectThickness.Checked ? 1 : 2;
         settings.ConvSkipExisting = _skip.Checked;
+        settings.ConvAssignInnerFaceAsASide = _assignInnerFaceAsASide.Checked;
         settings.ConvTolerance = (double)_tolerance.Value;
         settings.ConvLogFolder = _logFolder.Text.Trim();
         settings.ConvWriteLog = _writeLog.Checked;

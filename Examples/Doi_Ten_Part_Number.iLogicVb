@@ -1,0 +1,946 @@
+﻿AddReference "System.Windows.Forms"
+AddReference "System.Drawing"
+Imports System
+Imports System.Collections.Generic
+Imports System.Text
+Imports System.Text.RegularExpressions
+Imports WF = System.Windows.Forms
+Imports DR = System.Drawing
+' =====================================================================================
+'  ĐỔI TÊN PART NUMBER THEO PHÂN CẤP LẮP RÁP  -  iLogic rule độc lập (Inventor 2027)
+'
+'  Cách dùng: mở file Assembly (.iam) cần đánh số -> chạy rule này.
+'  Cấu trúc mã: Prefix + [A|P|T] + Hậu tố (n ký tự)
+'     A00            : cụm lắp tổng (đang mở, cố định)
+'     A01, A02, ...  : cụm lắp con      P01, P02, ... : chi tiết thường
+'     T01, T02, ...  : chi tiết tấm (Sheet Metal)
+'  Mỗi loại A/P/T có bộ đếm riêng, đánh số theo thứ tự cấp lắp ráp từ trên xuống,
+'  trong cùng cấp theo thứ tự Model browser.
+'
+'  Cấu trúc code (để sau này đưa vào add-in chỉ cần copy 3 class đầu):
+'     PNItem  : dữ liệu 1 dòng (1 file)
+'     PNEngine: quét cây + tính mã + ghi iProperty (KHÔNG có giao diện)
+'     RenameForm: giao diện WinForms
+'
+'  TODO (tích hợp add-in): thêm tùy chọn đổi tên FILE (.ipt/.iam) theo Part Number.
+' =====================================================================================
+
+
+Sub Main()
+    ' Form không modal để vẫn thao tác được cửa sổ mô hình Inventor.
+    Dim modal As Boolean = False
+
+    Dim doc As Inventor.Document = ThisApplication.ActiveDocument
+    If doc Is Nothing OrElse doc.DocumentType <> Inventor.DocumentTypeEnum.kAssemblyDocumentObject Then
+        WF.MessageBox.Show("Hãy mở file Assembly (.iam) rồi chạy lại rule này.", "Đổi tên Part Number", WF.MessageBoxButtons.OK, WF.MessageBoxIcon.Information)
+        Return
+    End If
+    If Not System.IO.File.Exists(doc.FullFileName) Then
+        WF.MessageBox.Show("Assembly chưa được lưu. Hãy lưu file trước khi đổi Part Number.", "Đổi tên Part Number", WF.MessageBoxButtons.OK, WF.MessageBoxIcon.Information)
+        Return
+    End If
+
+    Dim f As New RenameForm(ThisApplication, CType(doc, Inventor.AssemblyDocument))
+    If modal Then
+        f.ShowDialog()
+    Else
+        f.Show()
+    End If
+End Sub
+
+
+' =====================================================================================
+'  1) DỮ LIỆU MỘT DÒNG
+' =====================================================================================
+Public Class PNItem
+    Public Doc As Inventor.Document
+    Public Occ As Inventor.ComponentOccurrence   ' occurrence đại diện (proxy) để xem 3D; Nothing = cụm lắp tổng
+    Public DocKey As String
+    Public Depth As Integer                      ' 0 = cụm lắp tổng
+    Public Kind As String                        ' "A" / "P" / "T" ("" = không hỗ trợ)
+    Public KindText As String
+    Public OldPN As String
+    Public NewPN As String
+    Public Status As String
+    Public IsTop As Boolean
+    Public IsLibrary As Boolean
+    Public IgnoreReason As String = ""           ' khác rỗng = luôn bỏ qua (iPart/iAssembly, file ngoại lai...)
+    Public Skip As Boolean                       ' người dùng tích bỏ qua
+
+    Public ReadOnly Property LevelText As String
+        Get
+            If IsTop Then Return "Gốc (cụm lắp tổng)"
+            Return "Cấp " & (Depth + 1).ToString()
+        End Get
+    End Property
+End Class
+
+
+' =====================================================================================
+'  2) ENGINE: QUÉT + TÍNH MÃ + GHI (không có giao diện)
+' =====================================================================================
+Public Class PNEngine
+    Public Const SHEET_METAL_GUID As String = "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}"
+    Public Const ST_RENAME As String = "Sẽ đổi tên"
+    Public Const ST_KEEP As String = "Giữ nguyên (đã đúng)"
+    Public Const ST_LIB As String = "Thư viện (bỏ qua)"
+    Public Const ST_SKIP As String = "Bỏ qua (người dùng)"
+    Public Const ST_DONE As String = "Đã đổi"
+    Public Const ST_ERR As String = "Lỗi"
+    Public Const ST_OVER As String = "Lỗi: vượt giới hạn hậu tố"
+
+    Private Class QNode
+        Public Occ As Inventor.ComponentOccurrence
+        Public Depth As Integer
+        Public Sub New(o As Inventor.ComponentOccurrence, d As Integer)
+            Occ = o
+            Depth = d
+        End Sub
+    End Class
+
+    Private _app As Inventor.Application
+    Private _top As Inventor.AssemblyDocument
+    Private _libPaths As List(Of String)
+
+    Public Items As New List(Of PNItem)
+    Public LogCallback As Action(Of String)
+    Public OkCount As Integer
+    Public ErrCount As Integer
+
+    Public Sub New(app As Inventor.Application, topDoc As Inventor.AssemblyDocument)
+        _app = app
+        _top = topDoc
+        _libPaths = LoadLibraryPaths()
+    End Sub
+
+    Private Sub WriteLog(msg As String)
+        If LogCallback IsNot Nothing Then LogCallback.Invoke(msg)
+    End Sub
+
+    ' ---------- Part Number ----------
+    Public Shared Function GetPN(d As Inventor.Document) As String
+        Try
+            Return CStr(d.PropertySets.Item("Design Tracking Properties").Item("Part Number").Value).Trim()
+        Catch
+            Return ""
+        End Try
+    End Function
+
+    Public Shared Sub SetPN(d As Inventor.Document, v As String)
+        d.PropertySets.Item("Design Tracking Properties").Item("Part Number").Value = v
+    End Sub
+
+    Public Shared Function Compose(prefix As String, kind As String, n As Integer, digits As Integer) As String
+        Return prefix & kind & n.ToString("D" & digits.ToString())
+    End Function
+
+    ' ---------- Đường dẫn thư viện ----------
+    Private Function LoadLibraryPaths() As List(Of String)
+        Dim res As New List(Of String)
+        Try
+            Dim prj As Object = _app.DesignProjectManager.ActiveDesignProject
+            Dim prjDir As String = System.IO.Path.GetDirectoryName(CStr(prj.FullFileName))
+            Try
+                Dim paths As Object = prj.LibraryPaths
+                For i As Integer = 1 To CInt(paths.Count)
+                    Try
+                        AddLibPath(res, CStr(paths.Item(i).Path), prjDir)
+                    Catch
+                    End Try
+                Next
+            Catch
+            End Try
+            Try
+                AddLibPath(res, CStr(prj.ContentCenterPath), prjDir)
+            Catch
+            End Try
+        Catch
+        End Try
+        Return res
+    End Function
+
+    Private Sub AddLibPath(res As List(Of String), p As String, prjDir As String)
+        If String.IsNullOrWhiteSpace(p) Then Return
+        Try
+            If Not System.IO.Path.IsPathRooted(p) Then p = System.IO.Path.Combine(prjDir, p)
+            p = System.IO.Path.GetFullPath(p)
+            If Not p.EndsWith("\") Then p &= "\"
+            res.Add(p)
+        Catch
+        End Try
+    End Sub
+
+    Private Function IsLibraryDoc(d As Inventor.Document, def As Object) As Boolean
+        Try
+            If CBool(CallByName(def, "IsContentMember", CallType.Get)) Then Return True
+        Catch
+        End Try
+        Dim f As String = d.FullFileName
+        For Each lp As String In _libPaths
+            If f.StartsWith(lp, StringComparison.OrdinalIgnoreCase) Then Return True
+        Next
+        Return False
+    End Function
+
+    Private Function IsiMember(def As Object) As Boolean
+        For Each pn As String In New String() {"IsiPartMember", "IsiPartFactory", "IsiAssemblyMember", "IsiAssemblyFactory"}
+            Try
+                If CBool(CallByName(def, pn, CallType.Get)) Then Return True
+            Catch
+            End Try
+        Next
+        Return False
+    End Function
+
+    ' ---------- Quét cây lắp ráp (theo từng cấp, mỗi file 1 lần) ----------
+    Private Function MakeItem(d As Inventor.Document, occ As Inventor.ComponentOccurrence, depth As Integer, def As Object) As PNItem
+        Dim it As New PNItem
+        it.Doc = d
+        it.Occ = occ
+        it.Depth = depth
+        it.DocKey = d.FullDocumentName
+        it.OldPN = GetPN(d)
+        it.NewPN = ""
+        it.Status = ""
+
+        Select Case d.DocumentType
+            Case Inventor.DocumentTypeEnum.kAssemblyDocumentObject
+                it.Kind = "A"
+                it.KindText = "Assembly"
+            Case Inventor.DocumentTypeEnum.kPartDocumentObject
+                If d.SubType = SHEET_METAL_GUID Then
+                    it.Kind = "T"
+                    it.KindText = "Tấm (Sheet Metal)"
+                Else
+                    it.Kind = "P"
+                    it.KindText = "Part"
+                End If
+            Case Else
+                it.Kind = ""
+                it.KindText = d.DocumentType.ToString()
+                it.IgnoreReason = "Không hỗ trợ (bỏ qua)"
+        End Select
+
+        If it.IgnoreReason = "" Then
+            If IsiMember(def) Then
+                it.IgnoreReason = "iPart/iAssembly (bỏ qua)"
+            ElseIf IsLibraryDoc(d, def) Then
+                it.IsLibrary = True
+            End If
+        End If
+        Return it
+    End Function
+
+    Public Sub Scan()
+        Items.Clear()
+        Dim seen As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+        Dim topItem As PNItem = MakeItem(_top, Nothing, 0, _top.ComponentDefinition)
+        topItem.IsTop = True
+        topItem.IsLibrary = False
+        topItem.IgnoreReason = ""
+        Items.Add(topItem)
+        seen.Add(topItem.DocKey)
+
+        Dim q As New Queue(Of QNode)
+        For Each occ As Inventor.ComponentOccurrence In _top.ComponentDefinition.Occurrences
+            q.Enqueue(New QNode(occ, 1))
+        Next
+
+        While q.Count > 0
+            Dim n As QNode = q.Dequeue()
+            Dim occ As Inventor.ComponentOccurrence = n.Occ
+            Try
+                If occ.Suppressed Then Continue While
+                If TypeOf occ.Definition Is Inventor.VirtualComponentDefinition Then Continue While
+
+                Dim d As Inventor.Document = CType(occ.Definition.Document, Inventor.Document)
+                If seen.Contains(d.FullDocumentName) Then Continue While
+                seen.Add(d.FullDocumentName)
+
+                Dim it As PNItem = MakeItem(d, occ, n.Depth, occ.Definition)
+                Items.Add(it)
+
+                If d.DocumentType = Inventor.DocumentTypeEnum.kAssemblyDocumentObject Then
+                    For Each so As Inventor.ComponentOccurrence In occ.SubOccurrences
+                        q.Enqueue(New QNode(so, n.Depth + 1))
+                    Next
+                End If
+            Catch ex As Exception
+                Dim nm As String = "?"
+                Try
+                    nm = occ.Name
+                Catch
+                End Try
+                WriteLog("Không đọc được thành phần '" & nm & "': " & ex.Message.Replace(vbCr, " ").Replace(vbLf, " "))
+            End Try
+        End While
+    End Sub
+
+    ' ---------- Tính mã mới ----------
+    Private Function ParseNum(pn As String, prefix As String, kind As String, digits As Integer) As Integer
+        If kind = "" OrElse pn = "" Then Return -1
+        Dim m As Match = Regex.Match(pn, "^" & Regex.Escape(prefix) & kind & "([0-9]{" & digits.ToString() & "})$")
+        If m.Success Then Return CInt(m.Groups(1).Value)
+        Return -1
+    End Function
+
+    Private Sub Reserve(used As Dictionary(Of String, HashSet(Of Integer)), kind As String, num As Integer)
+        If kind <> "" AndAlso num >= 0 Then used(kind).Add(num)
+    End Sub
+
+    Public Sub Compute(prefix As String, digits As Integer, overwrite As Boolean, includeLib As Boolean)
+        Dim maxVal As Integer = CInt(Math.Pow(10, digits)) - 1
+
+        Dim used As New Dictionary(Of String, HashSet(Of Integer))
+        For Each k As String In New String() {"A", "P", "T"}
+            used(k) = New HashSet(Of Integer)
+        Next
+        used("A").Add(0)                     ' A00 dành cho cụm lắp tổng
+
+        For Each it As PNItem In Items
+            it.NewPN = ""
+            it.Status = ""
+        Next
+
+        ' Lượt 0: các dòng KHÔNG bị đổi -> giữ chỗ mã hiện có (nếu đúng mẫu) để mã mới không trùng
+        For Each it As PNItem In Items
+            If it.IgnoreReason <> "" Then
+                it.Status = it.IgnoreReason
+                Reserve(used, it.Kind, ParseNum(it.OldPN, prefix, it.Kind, digits))
+            ElseIf it.IsLibrary AndAlso Not includeLib Then
+                it.Status = ST_LIB
+                Reserve(used, it.Kind, ParseNum(it.OldPN, prefix, it.Kind, digits))
+            ElseIf it.Skip Then
+                it.Status = ST_SKIP
+                Reserve(used, it.Kind, ParseNum(it.OldPN, prefix, it.Kind, digits))
+            End If
+        Next
+
+        ' Lượt 1: cụm lắp tổng + (chế độ không ghi đè) giữ lại mã đã đúng mẫu
+        For Each it As PNItem In Items
+            If it.Status <> "" Then Continue For
+            If it.IsTop Then
+                it.NewPN = Compose(prefix, "A", 0, digits)
+                Continue For
+            End If
+            If Not overwrite Then
+                Dim num As Integer = ParseNum(it.OldPN, prefix, it.Kind, digits)
+                If num >= 0 AndAlso Not used(it.Kind).Contains(num) Then
+                    used(it.Kind).Add(num)
+                    it.NewPN = it.OldPN
+                End If
+            End If
+        Next
+
+        ' Lượt 2: gán số mới theo thứ tự cấp lắp ráp (Items đã sắp theo cấp, rồi theo Model browser)
+        Dim counters As New Dictionary(Of String, Integer)
+        counters("A") = 0
+        counters("P") = 0
+        counters("T") = 0
+        For Each it As PNItem In Items
+            If it.Status <> "" OrElse it.NewPN <> "" Then Continue For
+            Dim k As String = it.Kind
+            Dim c As Integer = counters(k)
+            Do
+                c += 1
+            Loop While used(k).Contains(c)
+            counters(k) = c
+            If c > maxVal Then
+                it.Status = ST_OVER
+                Continue For
+            End If
+            used(k).Add(c)
+            it.NewPN = Compose(prefix, k, c, digits)
+        Next
+
+        ' Lượt 3: trạng thái
+        For Each it As PNItem In Items
+            If it.Status <> "" Then Continue For
+            If String.Equals(it.NewPN, it.OldPN, StringComparison.Ordinal) Then
+                it.Status = ST_KEEP
+            Else
+                it.Status = ST_RENAME
+            End If
+        Next
+    End Sub
+
+    Public Function CountStatus(st As String) As Integer
+        Dim n As Integer = 0
+        For Each it As PNItem In Items
+            If it.Status = st Then n += 1
+        Next
+        Return n
+    End Function
+
+    Public Function CountHardIgnored() As Integer
+        Dim n As Integer = 0
+        For Each it As PNItem In Items
+            If it.IgnoreReason <> "" Then n += 1
+        Next
+        Return n
+    End Function
+
+    ' Số chi tiết/cụm lắp cần đánh số (không tính cụm lắp tổng, không tính file bị bỏ qua cứng/thư viện)
+    Public Function CountTargets(includeLib As Boolean) As Integer
+        Dim n As Integer = 0
+        For Each it As PNItem In Items
+            If it.IsTop OrElse it.IgnoreReason <> "" Then Continue For
+            If it.IsLibrary AndAlso Not includeLib Then Continue For
+            n += 1
+        Next
+        Return n
+    End Function
+
+    ' ---------- Sao lưu mã cũ ra CSV (đường lui) ----------
+    Private Shared Function Csv(s As String) As String
+        If s Is Nothing Then s = ""
+        Return """" & s.Replace("""", """""") & """"
+    End Function
+
+    Public Function WriteBackup() As String
+        Dim sb As New StringBuilder
+        sb.AppendLine("File,PartNumber_Cu,PartNumber_Moi,TrangThai")
+        For Each it As PNItem In Items
+            If it.Status = ST_RENAME Then
+                sb.AppendLine(Csv(it.Doc.FullFileName) & "," & Csv(it.OldPN) & "," & Csv(it.NewPN) & "," & Csv(it.Status))
+            End If
+        Next
+
+        Dim fileName As String = System.IO.Path.GetFileNameWithoutExtension(_top.FullFileName) & "_PartNumber_backup_" & DateTime.Now.ToString("yyyyMMdd_HHmmss") & ".csv"
+        Dim dirs As String() = New String() {System.IO.Path.GetDirectoryName(_top.FullFileName), System.IO.Path.GetTempPath()}
+        For Each dir As String In dirs
+            Try
+                Dim p As String = System.IO.Path.Combine(Dir, fileName)
+                System.IO.File.WriteAllText(p, sb.ToString(), New UTF8Encoding(True))
+                Return p
+            Catch
+            End Try
+        Next
+        Return ""
+    End Function
+
+    ' ---------- Ghi Part Number ----------
+    Public Sub Apply()
+        OkCount = 0
+        ErrCount = 0
+        For Each it As PNItem In Items
+            If it.Status <> ST_RENAME Then Continue For
+            Try
+                SetPN(it.Doc, it.NewPN)
+                If GetPN(it.Doc) <> it.NewPN Then
+                    Throw New Exception("không ghi được giá trị (iProperty bị khóa hoặc file chỉ đọc?)")
+                End If
+                it.Status = ST_DONE
+                OkCount += 1
+                WriteLog(it.LevelText & " | " & it.OldPN & "  ->  " & it.NewPN)
+            Catch ex As Exception
+                Dim msg As String = ex.Message.Replace(vbCr, " ").Replace(vbLf, " ")
+                it.Status = ST_ERR & ": " & msg
+                ErrCount += 1
+                WriteLog("LỖI | " & it.OldPN & " : " & msg)
+            End Try
+        Next
+    End Sub
+
+    ' ---------- Xem 3D: mở tài liệu chi tiết/cụm trong cửa sổ Inventor ----------
+    Public Sub ShowInView(it As PNItem)
+        Try
+            Dim viewDoc As Inventor.Document = Nothing
+            If it Is Nothing OrElse it.Doc Is Nothing Then Return
+
+            ' Mở tài liệu ở chế độ hiển thị. Nếu tài liệu đã được nạp trong Assembly,
+            ' Inventor sẽ kích hoạt tài liệu đó thay vì tạo bản sao.
+            If it.IsTop Then
+                viewDoc = _top
+            Else
+                viewDoc = _app.Documents.Open(it.Doc.FullFileName, True)
+            End If
+
+            If viewDoc Is Nothing Then Throw New Exception("Inventor không mở được tài liệu được chọn.")
+            viewDoc.Activate()
+            _app.ActiveView.Fit()
+            _app.ActiveView.Update()
+            WriteLog("Đang xem mô hình 3D: " & System.IO.Path.GetFileName(viewDoc.FullFileName))
+        Catch ex As Exception
+            WriteLog("Không mở được mô hình 3D: " & ex.Message.Replace(vbCr, " ").Replace(vbLf, " "))
+        End Try
+    End Sub
+End Class
+
+
+' =====================================================================================
+'  3) GIAO DIỆN
+' =====================================================================================
+Public Class RenameForm
+    Inherits WF.Form
+
+    Private Const REG_KEY As String = "Software\ZCTools\RenamePartNumber"
+
+    Private _app As Inventor.Application
+    Private _top As Inventor.AssemblyDocument
+    Private _engine As PNEngine
+    Private _skipKeys As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+    Private _busy As Boolean = False
+    Private _applied As Boolean = False
+
+    Private txtPrefix As WF.TextBox
+    Private txtTotal As WF.TextBox
+    Private nudDigits As WF.NumericUpDown
+    Private chkOverwrite As WF.CheckBox
+    Private chkLib As WF.CheckBox
+    Private btnPreview As WF.Button
+    Private btnRun As WF.Button
+    Private lblStructSub As WF.Label
+    Private lblStructBody As WF.Label
+    Private grid As WF.DataGridView
+    Private txtLog As WF.TextBox
+
+    Public Sub New(app As Inventor.Application, topDoc As Inventor.AssemblyDocument)
+        _app = app
+        _top = topDoc
+        _engine = New PNEngine(app, topDoc)
+        _engine.LogCallback = New Action(Of String)(AddressOf AppendLog)
+        BuildUI()
+    End Sub
+
+    ' ---------- Cài đặt nhớ lại (registry) ----------
+    ' Registry persistence is intentionally disabled for iLogic compatibility.
+    Private Function RegGet(name As String, def As String) As String
+        Return def
+    End Function
+
+    Private Sub RegSet(name As String, value As String)
+        ' No-op: this rule does not write to Windows Registry.
+    End Sub
+
+    Private Function GuessPrefix(pn As String) As String
+        If pn Is Nothing Then Return ""
+        Dim p As Integer = pn.LastIndexOf("-"c)
+        If p >= 0 Then Return pn.Substring(0, p + 1)
+        Return ""
+    End Function
+
+    ' ---------- Dựng giao diện ----------
+    Private Function MakeLabel(Text As String, x As Integer, y As Integer) As WF.Label
+        Dim l As New WF.Label
+        l.Text = text
+        l.AutoSize = True
+        l.Location = New DR.Point(x, y)
+        Return l
+    End Function
+
+    Private Function AddTextCol(header As String, weight As Single) As WF.DataGridViewTextBoxColumn
+        Dim c As New WF.DataGridViewTextBoxColumn
+        c.HeaderText = header
+        c.FillWeight = weight
+        c.ReadOnly = True
+        c.SortMode = WF.DataGridViewColumnSortMode.Automatic
+        grid.Columns.Add(c)
+        Return c
+    End Function
+
+    Private Sub BuildUI()
+        Me.Text = "Đổi tên Part Number theo phân cấp lắp ráp"
+        Me.Font = New DR.Font("Segoe UI", 9.0F)
+        Me.ClientSize = New DR.Size(720, 760)
+        Me.MinimumSize = New DR.Size(720, 620)
+        Me.StartPosition = WF.FormStartPosition.CenterScreen
+        Me.BackColor = DR.Color.White
+
+        Dim anchTR As WF.AnchorStyles = WF.AnchorStyles.Top Or WF.AnchorStyles.Right
+        Dim anchTLR As WF.AnchorStyles = WF.AnchorStyles.Top Or WF.AnchorStyles.Left Or WF.AnchorStyles.Right
+
+        ' --- Hàng 1: Prefix / Tổng SL / Số ký tự hậu tố ---
+        Me.Controls.Add(MakeLabel("Prefix:", 20, 22))
+        txtPrefix = New WF.TextBox
+        txtPrefix.Location = New DR.Point(80, 18)
+        txtPrefix.Size = New DR.Size(195, 25)
+        Me.Controls.Add(txtPrefix)
+
+        Dim lblTotal As WF.Label = MakeLabel("Tổng SL chi tiết_cụm lắp:", 322, 22)
+        lblTotal.Anchor = anchTR
+        Me.Controls.Add(lblTotal)
+        txtTotal = New WF.TextBox
+        txtTotal.Location = New DR.Point(480, 18)
+        txtTotal.Size = New DR.Size(70, 25)
+        txtTotal.ReadOnly = True
+        txtTotal.TextAlign = WF.HorizontalAlignment.Center
+        txtTotal.Anchor = anchTR
+        Me.Controls.Add(txtTotal)
+
+        Dim lblDigits As WF.Label = MakeLabel("Số ký tự hậu tố:", 580, 22)
+        lblDigits.Anchor = anchTR
+        Me.Controls.Add(lblDigits)
+        nudDigits = New WF.NumericUpDown
+        nudDigits.Location = New DR.Point(668, 18)
+        nudDigits.Size = New DR.Size(42, 25)
+        nudDigits.Minimum = 1
+        nudDigits.Maximum = 4
+        nudDigits.Anchor = anchTR
+        Me.Controls.Add(nudDigits)
+
+        ' --- Hàng 2: checkbox + nút ---
+        chkOverwrite = New WF.CheckBox
+        chkOverwrite.Text = "Ghi mới hoàn toàn (bỏ qua mã hiện có)"
+        chkOverwrite.AutoSize = True
+        chkOverwrite.Location = New DR.Point(20, 55)
+        Me.Controls.Add(chkOverwrite)
+
+        chkLib = New WF.CheckBox
+        chkLib.Text = "Đổi tên các chi tiết file thư viện"
+        chkLib.AutoSize = True
+        chkLib.Location = New DR.Point(20, 80)
+        Me.Controls.Add(chkLib)
+
+        btnPreview = New WF.Button
+        btnPreview.Text = "Xem trước"
+        btnPreview.Location = New DR.Point(418, 52)
+        btnPreview.Size = New DR.Size(135, 32)
+        btnPreview.Anchor = anchTR
+        Me.Controls.Add(btnPreview)
+
+        btnRun = New WF.Button
+        btnRun.Text = "Thực hiện đổi tên"
+        btnRun.Location = New DR.Point(568, 52)
+        btnRun.Size = New DR.Size(142, 32)
+        btnRun.Anchor = anchTR
+        btnRun.Enabled = False
+        Me.Controls.Add(btnRun)
+
+        ' --- Khung cấu trúc mã ---
+        Dim pnl As New WF.Panel
+        pnl.Location = New DR.Point(20, 108)
+        pnl.Size = New DR.Size(680, 142)
+        pnl.BorderStyle = WF.BorderStyle.FixedSingle
+        pnl.BackColor = DR.Color.White
+        pnl.Anchor = anchTLR
+
+        Dim lblT As New WF.Label
+        lblT.Text = "Cấu trúc mã Part Number"
+        lblT.Font = New DR.Font("Segoe UI", 10.5F, DR.FontStyle.Bold)
+        lblT.ForeColor = DR.Color.FromArgb(0, 0, 128)
+        lblT.TextAlign = DR.ContentAlignment.MiddleCenter
+        lblT.AutoSize = False
+        lblT.Location = New DR.Point(2, 4)
+        lblT.Size = New DR.Size(674, 22)
+        lblT.Anchor = anchTLR
+        pnl.Controls.Add(lblT)
+
+        lblStructSub = New WF.Label
+        lblStructSub.Font = New DR.Font("Segoe UI", 8.5F)
+        lblStructSub.ForeColor = DR.Color.DimGray
+        lblStructSub.TextAlign = DR.ContentAlignment.MiddleCenter
+        lblStructSub.AutoSize = False
+        lblStructSub.Location = New DR.Point(2, 26)
+        lblStructSub.Size = New DR.Size(674, 16)
+        lblStructSub.Anchor = anchTLR
+        pnl.Controls.Add(lblStructSub)
+
+        lblStructBody = New WF.Label
+        lblStructBody.Font = New DR.Font("Consolas", 10.0F, DR.FontStyle.Bold)
+        lblStructBody.ForeColor = DR.Color.FromArgb(0, 0, 128)
+        lblStructBody.AutoSize = False
+        lblStructBody.Location = New DR.Point(14, 48)
+        lblStructBody.Size = New DR.Size(650, 74)
+        lblStructBody.Anchor = anchTLR
+        pnl.Controls.Add(lblStructBody)
+
+        Dim lblNote As New WF.Label
+        lblNote.Text = "Ghi chú: mỗi loại A/P/T có bộ đếm hậu tố riêng, đánh số theo thứ tự cấp lắp ráp từ cao nhất đến thấp nhất."
+        lblNote.Font = New DR.Font("Segoe UI", 8.0F, DR.FontStyle.Italic)
+        lblNote.ForeColor = DR.Color.Gray
+        lblNote.TextAlign = DR.ContentAlignment.MiddleCenter
+        lblNote.AutoSize = False
+        lblNote.Location = New DR.Point(2, 123)
+        lblNote.Size = New DR.Size(674, 16)
+        lblNote.Anchor = anchTLR
+        pnl.Controls.Add(lblNote)
+        Me.Controls.Add(pnl)
+
+        ' --- Bảng ---
+        grid = New WF.DataGridView
+        grid.Location = New DR.Point(20, 258)
+        grid.Size = New DR.Size(680, 328)
+        grid.Anchor = WF.AnchorStyles.Top Or WF.AnchorStyles.Bottom Or WF.AnchorStyles.Left Or WF.AnchorStyles.Right
+        grid.AllowUserToAddRows = False
+        grid.AllowUserToDeleteRows = False
+        grid.AllowUserToResizeRows = False
+        grid.RowHeadersVisible = False
+        grid.MultiSelect = False
+        grid.SelectionMode = WF.DataGridViewSelectionMode.FullRowSelect
+        grid.BackgroundColor = DR.Color.White
+        grid.GridColor = DR.Color.FromArgb(160, 130, 190)
+        grid.EnableHeadersVisualStyles = False
+        grid.ColumnHeadersDefaultCellStyle.BackColor = DR.Color.FromArgb(0, 0, 150)
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = DR.Color.White
+        grid.ColumnHeadersDefaultCellStyle.Font = New DR.Font("Segoe UI", 9.0F, DR.FontStyle.Bold)
+        grid.ColumnHeadersDefaultCellStyle.Alignment = WF.DataGridViewContentAlignment.MiddleCenter
+        grid.ColumnHeadersDefaultCellStyle.WrapMode = WF.DataGridViewTriState.True
+        grid.ColumnHeadersHeightSizeMode = WF.DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+        grid.ColumnHeadersHeight = 44
+        grid.RowTemplate.Height = 24
+        grid.DefaultCellStyle.SelectionBackColor = DR.Color.FromArgb(0, 120, 215)
+        grid.DefaultCellStyle.SelectionForeColor = DR.Color.White
+        grid.AutoSizeColumnsMode = WF.DataGridViewAutoSizeColumnsMode.Fill
+
+        AddTextCol("Bậc lắp ráp", 19)                                   ' 0
+        AddTextCol("Loại", 15)                                          ' 1
+        Dim cBtn As New WF.DataGridViewButtonColumn                     ' 2
+        cBtn.HeaderText = "Part Number gốc" & vbLf & "(bấm để xem 3D)"
+        cBtn.FillWeight = 22
+        cBtn.ReadOnly = True
+        cBtn.FlatStyle = WF.FlatStyle.Flat
+        cBtn.DefaultCellStyle.BackColor = DR.Color.White
+        cBtn.DefaultCellStyle.ForeColor = DR.Color.Black
+        cBtn.DefaultCellStyle.Alignment = WF.DataGridViewContentAlignment.MiddleLeft
+        cBtn.SortMode = WF.DataGridViewColumnSortMode.NotSortable
+        grid.Columns.Add(cBtn)
+        AddTextCol("Part Number sau khi đổi" & vbLf & "(xem trước)", 22)  ' 3
+        AddTextCol("Trạng thái", 20)                                      ' 4
+        Dim cChk As New WF.DataGridViewCheckBoxColumn                     ' 5
+        cChk.HeaderText = "Bỏ qua"
+        cChk.FillWeight = 8
+        cChk.SortMode = WF.DataGridViewColumnSortMode.NotSortable
+        grid.Columns.Add(cChk)
+        Me.Controls.Add(grid)
+
+        ' --- Log ---
+        Dim lblLog As WF.Label = MakeLabel("Log:", 20, 594)
+        lblLog.Anchor = WF.AnchorStyles.Bottom Or WF.AnchorStyles.Left
+        Me.Controls.Add(lblLog)
+        txtLog = New WF.TextBox
+        txtLog.Location = New DR.Point(20, 614)
+        txtLog.Size = New DR.Size(680, 130)
+        txtLog.Multiline = True
+        txtLog.ReadOnly = True
+        txtLog.ScrollBars = WF.ScrollBars.Vertical
+        txtLog.BackColor = DR.Color.White
+        txtLog.Anchor = WF.AnchorStyles.Bottom Or WF.AnchorStyles.Left Or WF.AnchorStyles.Right
+        Me.Controls.Add(txtLog)
+
+        ' --- Giá trị ban đầu ---
+        Dim pfx As String = GuessPrefix(PNEngine.GetPN(_top))
+        If pfx = "" Then pfx = RegGet("Prefix", "")
+        txtPrefix.Text = pfx
+        Dim dg As Integer = 2
+        Integer.TryParse(RegGet("Digits", "2"), dg)
+        nudDigits.Value = Math.Max(1, Math.Min(4, dg))
+        chkOverwrite.Checked = (RegGet("Overwrite", "1") = "1")
+        chkLib.Checked = (RegGet("IncludeLib", "0") = "1")
+        UpdateStructure()
+        txtTotal.Text = "0"
+
+        ' --- Sự kiện (gắn sau khi đã đặt giá trị ban đầu) ---
+        AddHandler btnPreview.Click, AddressOf OnPreview
+        AddHandler btnRun.Click, AddressOf OnRun
+        AddHandler txtPrefix.TextChanged, AddressOf OnParamChanged
+        AddHandler nudDigits.ValueChanged, AddressOf OnParamChanged
+        AddHandler chkOverwrite.CheckedChanged, AddressOf OnParamChanged
+        AddHandler chkLib.CheckedChanged, AddressOf OnParamChanged
+        AddHandler grid.CellClick, AddressOf OnGridCellClick
+        AddHandler grid.CellValueChanged, AddressOf OnGridCellValueChanged
+        AddHandler grid.CurrentCellDirtyStateChanged, AddressOf OnGridDirty
+        AddHandler Me.FormClosing, AddressOf HandleFormClosing
+    End Sub
+
+    ' ---------- Tiện ích giao diện ----------
+    Public Sub AppendLog(msg As String)
+        txtLog.AppendText("[" & DateTime.Now.ToString("HH:mm:ss") & "] " & msg & vbCrLf)
+    End Sub
+
+    Private Sub UpdateStructure()
+        Dim p As String = txtPrefix.Text.Trim()
+        Dim n As Integer = CInt(nudDigits.Value)
+        lblStructSub.Text = "Prefix + [A|P|T] + Hậu tố (" & n.ToString() & " ký tự)"
+        lblStructBody.Text = "Cụm lắp tổng (đang mở, mã cố định): " & PNEngine.Compose(p, "A", 0, n) & vbCrLf &
+            "Cụm lắp con (A, tăng dần từ 1): " & PNEngine.Compose(p, "A", 1, n) & ", " & PNEngine.Compose(p, "A", 2, n) & ", ..." & vbCrLf &
+            "Chi tiết thường (P, tăng dần từ 1): " & PNEngine.Compose(p, "P", 1, n) & ", " & PNEngine.Compose(p, "P", 2, n) & ", ..." & vbCrLf &
+            "Chi tiết dạng tấm (T, tăng dần từ 1): " & PNEngine.Compose(p, "T", 1, n) & ", " & PNEngine.Compose(p, "T", 2, n) & ", ..."
+    End Sub
+
+    Private Function ColorFor(st As String) As DR.Color
+        If st = PNEngine.ST_RENAME Then Return DR.Color.LightGreen
+        If st = PNEngine.ST_DONE Then Return DR.Color.FromArgb(150, 200, 255)
+        If st.StartsWith("Lỗi") Then Return DR.Color.FromArgb(255, 150, 150)
+        If st = PNEngine.ST_KEEP Then Return DR.Color.FromArgb(255, 255, 190)
+        Return DR.Color.FromArgb(220, 220, 220)
+    End Function
+
+    Private Sub FillGrid()
+        _busy = True
+        grid.Rows.Clear()
+        For Each it As PNItem In _engine.Items
+            Dim idx As Integer = grid.Rows.Add()
+            Dim row As WF.DataGridViewRow = grid.Rows(idx)
+            row.Tag = it
+            row.Cells(0).Value = it.LevelText
+            row.Cells(1).Value = it.KindText
+            row.Cells(5).Value = it.Skip
+        Next
+        _busy = False
+        RefreshGrid()
+    End Sub
+
+    Private Sub RefreshGrid()
+        _busy = True
+        For Each row As WF.DataGridViewRow In grid.Rows
+            Dim it As PNItem = TryCast(Row.Tag, PNItem)
+            If it Is Nothing Then Continue For
+
+            Row.Cells(2).Value = If(it.OldPN = "", "(trống)", it.OldPN)
+            Row.Cells(3).Value = If(it.NewPN = "", "—", it.NewPN)
+            Row.Cells(4).Value = it.Status
+
+            Dim bg As DR.Color = ColorFor(it.Status)
+            For Each i As Integer In New Integer() {0, 1, 3, 4, 5}
+                Row.Cells(i).Style.BackColor = bg
+            Next
+            Row.Cells(5).ReadOnly = (it.IgnoreReason <> "") OrElse (it.IsLibrary AndAlso Not chkLib.Checked) OrElse _applied
+        Next
+        _busy = False
+    End Sub
+
+    Private Sub DoCompute()
+        _engine.Compute(txtPrefix.Text.Trim(), CInt(nudDigits.Value), chkOverwrite.Checked, chkLib.Checked)
+        txtTotal.Text = _engine.CountTargets(chkLib.Checked).ToString()
+        btnRun.Enabled = (Not _applied) AndAlso _engine.CountStatus(PNEngine.ST_RENAME) > 0 AndAlso _engine.CountStatus(PNEngine.ST_OVER) = 0
+    End Sub
+
+    Private Sub LogPreview()
+        Dim p As String = txtPrefix.Text.Trim()
+        Dim n As Integer = CInt(nudDigits.Value)
+        AppendLog("Tổng số chi tiết & cụm lắp cần đánh số (chưa tính cụm lắp tổng): " & _engine.CountTargets(chkLib.Checked).ToString())
+        AppendLog("Số ký tự hậu tố đang dùng: " & n.ToString())
+        AppendLog("Sơ đồ mã: Prefix + [A|P|T] + Hậu tố | Ví dụ - Assembly: " & PNEngine.Compose(p, "A", 1, n) & ", Part: " & PNEngine.Compose(p, "P", 1, n) & ", Tấm: " & PNEngine.Compose(p, "T", 1, n))
+        AppendLog("Mã dành cho cụm lắp tổng: " & PNEngine.Compose(p, "A", 0, n))
+        AppendLog("Tổng số dòng: " & _engine.Items.Count.ToString())
+        AppendLog("Sẽ đổi tên: " & _engine.CountStatus(PNEngine.ST_RENAME).ToString() &
+                  " | Giữ nguyên (đã đúng): " & _engine.CountStatus(PNEngine.ST_KEEP).ToString() &
+                  " | Thư viện (bỏ qua): " & _engine.CountStatus(PNEngine.ST_LIB).ToString() &
+                  " | Bỏ qua (người dùng): " & _engine.CountStatus(PNEngine.ST_SKIP).ToString() &
+                  " | Không hỗ trợ: " & _engine.CountHardIgnored().ToString())
+        Dim over As Integer = _engine.CountStatus(PNEngine.ST_OVER)
+        If over > 0 Then
+            AppendLog("CẢNH BÁO: " & over.ToString() & " dòng vượt giới hạn hậu tố. Hãy tăng 'Số ký tự hậu tố'.")
+        End If
+        AppendLog("================================")
+    End Sub
+
+    ' ---------- Sự kiện ----------
+    Private Sub OnPreview(sender As Object, e As EventArgs)
+        If txtPrefix.Text.Trim() = "" Then
+            WF.MessageBox.Show("Hãy nhập Prefix (ví dụ: ZC-ATS-).", Me.Text, _
+                               WF.MessageBoxButtons.OK, WF.MessageBoxIcon.Information)
+            Return
+        End If
+        Me.Cursor = WF.Cursors.WaitCursor
+        Try
+            _engine.Scan()
+            For Each it As PNItem In _engine.Items
+                If _skipKeys.Contains(it.DocKey) Then it.Skip = True
+            Next
+            _applied = False
+            DoCompute()
+            FillGrid()
+            LogPreview()
+        Catch ex As Exception
+            AppendLog("LỖI khi quét: " & ex.Message.Replace(vbCr, " ").Replace(vbLf, " "))
+        Finally
+            Me.Cursor = WF.Cursors.Default
+        End Try
+    End Sub
+
+    Private Sub OnParamChanged(sender As Object, e As EventArgs)
+        UpdateStructure()
+        If _busy OrElse _applied OrElse _engine.Items.Count = 0 Then Return
+        If txtPrefix.Text.Trim() = "" Then
+            btnRun.Enabled = False
+            Return
+        End If
+        DoCompute()
+        RefreshGrid()
+    End Sub
+
+    Private Sub OnGridCellClick(sender As Object, e As WF.DataGridViewCellEventArgs)
+        If e.RowIndex < 0 OrElse e.ColumnIndex <> 2 Then Return
+        Dim it As PNItem = TryCast(grid.Rows(e.RowIndex).Tag, PNItem)
+        If it Is Nothing Then Return
+        _engine.ShowInView(it)
+    End Sub
+
+    Private Sub OnGridDirty(sender As Object, e As EventArgs)
+        If grid.IsCurrentCellDirty AndAlso grid.CurrentCell IsNot Nothing AndAlso grid.CurrentCell.ColumnIndex = 5 Then
+            grid.CommitEdit(WF.DataGridViewDataErrorContexts.Commit)
+        End If
+    End Sub
+
+    Private Sub OnGridCellValueChanged(sender As Object, e As WF.DataGridViewCellEventArgs)
+        If _busy OrElse e.RowIndex < 0 OrElse e.ColumnIndex <> 5 Then Return
+        Dim row As WF.DataGridViewRow = grid.Rows(e.RowIndex)
+        Dim it As PNItem = TryCast(row.Tag, PNItem)
+        If it Is Nothing Then Return
+
+        Dim v As Boolean = False
+        If row.Cells(5).Value IsNot Nothing Then v = CBool(row.Cells(5).Value)
+        it.Skip = v
+        If v Then
+            _skipKeys.Add(it.DocKey)
+        Else
+            _skipKeys.Remove(it.DocKey)
+        End If
+
+        If _applied OrElse txtPrefix.Text.Trim() = "" Then Return
+        DoCompute()
+        RefreshGrid()
+    End Sub
+
+    Private Sub OnRun(sender As Object, e As EventArgs)
+        If _applied OrElse _engine.Items.Count = 0 Then
+            WF.MessageBox.Show("Hãy bấm ""Xem trước"" trước khi thực hiện.", Me.Text, _
+                               WF.MessageBoxButtons.OK, WF.MessageBoxIcon.Information)
+            Return
+        End If
+        Dim n As Integer = _engine.CountStatus(PNEngine.ST_RENAME)
+        If n = 0 Then
+            WF.MessageBox.Show("Không có file nào cần đổi.", Me.Text, _
+                               WF.MessageBoxButtons.OK, WF.MessageBoxIcon.Information)
+            Return
+        End If
+        If WF.MessageBox.Show("Sẽ ghi Part Number mới cho " & n.ToString() & " file (chưa tự lưu)." & vbCrLf & _
+                              "Tiếp tục?", Me.Text, WF.MessageBoxButtons.YesNo, _
+                              WF.MessageBoxIcon.Question) <> WF.DialogResult.Yes Then Return
+
+        Dim bk As String = _engine.WriteBackup()
+        If bk = "" Then
+            If WF.MessageBox.Show("Không ghi được file sao lưu mã cũ. Vẫn tiếp tục?", Me.Text, _
+                                  WF.MessageBoxButtons.YesNo, WF.MessageBoxIcon.Warning, _
+                                  WF.MessageBoxDefaultButton.Button2) <> WF.DialogResult.Yes Then Return
+            AppendLog("CẢNH BÁO: không ghi được file sao lưu mã cũ.")
+        Else
+            AppendLog("Đã sao lưu mã cũ -> " & bk)
+        End If
+
+        Me.Cursor = WF.Cursors.WaitCursor
+        Try
+            _engine.Apply()
+        Finally
+            Me.Cursor = WF.Cursors.Default
+        End Try
+        _applied = True
+        RefreshGrid()
+        btnRun.Enabled = False
+        AppendLog("Đã đổi: " & _engine.OkCount.ToString() & " | Lỗi: " & _engine.ErrCount.ToString())
+        AppendLog("================================")
+        WF.MessageBox.Show("Đã đổi: " & _engine.OkCount.ToString() & " | Lỗi: " & _engine.ErrCount.ToString() & vbCrLf & _
+                           "Các file đã bị sửa nhưng CHƯA được lưu. Hãy kiểm tra rồi Save All.", Me.Text, _
+                           WF.MessageBoxButtons.OK, WF.MessageBoxIcon.Information)
+    End Sub
+
+    Private Sub HandleFormClosing(sender As Object, e As WF.FormClosingEventArgs)
+        RegSet("Prefix", txtPrefix.Text.Trim())
+        RegSet("Digits", CInt(nudDigits.Value).ToString())
+        RegSet("Overwrite", If(chkOverwrite.Checked, "1", "0"))
+        RegSet("IncludeLib", If(chkLib.Checked, "1", "0"))
+    End Sub
+End Class

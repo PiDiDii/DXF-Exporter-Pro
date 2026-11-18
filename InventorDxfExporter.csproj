@@ -23,10 +23,27 @@
       <EmbedInteropTypes>false</EmbedInteropTypes>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Autodesk.iLogic.Interfaces">
+      <HintPath>$(InventorBinPath)\Autodesk.iLogic.Interfaces.dll</HintPath>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="stdole">
       <HintPath>$(InventorBinPath)\stdole.dll</HintPath>
       <EmbedInteropTypes>false</EmbedInteropTypes>
       <Private>false</Private>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Examples\Doi_K_Factor_Assembly.vb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Doi_K_Factor_Assembly.vb</TargetPath>
+    </None>
+    <None Update="Examples\Doi_Ten_Part_Number.iLogicVb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Doi_Ten_Part_Number.iLogicVb</TargetPath>
+    </None>
   </ItemGroup>
 </Project>

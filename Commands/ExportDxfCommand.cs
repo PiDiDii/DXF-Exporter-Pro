@@ -58,7 +58,7 @@ public sealed class ExportDxfCommand
             if (string.IsNullOrWhiteSpace(item.Thickness) || item.Thickness == "T_Khong_Xac_Dinh") warnings.Add($"'{item.DetailName}' thiếu/không xác định độ dày.");
         }
         var duplicateFiles = items.GroupBy(item => IOPath.Combine(settings.OutputRoot, FileNameBuilder.CleanName(item.Material),
-                FileNameBuilder.CleanName(item.Thickness), FileNameBuilder.BuildFileName(item.Thickness, item.Quantity, item.Material, item.DetailName)),
+                FileNameBuilder.CleanName(item.Thickness), FileNameBuilder.BuildFileName(item.Thickness, item.Quantity, item.Material, item.PartNumber ?? item.DetailName)),
                 StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Count() > 1).Select(group => group.Key).ToArray();
         warnings.AddRange(duplicateFiles.Select(path => "Trùng tên file DXF dự kiến: " + path));
@@ -101,7 +101,8 @@ public sealed class ExportDxfCommand
         }
         var summary = string.Join(IOEnvironment.NewLine, result.Messages);
         if (string.IsNullOrWhiteSpace(summary)) summary = $"Đã xuất: {result.Success}; bỏ qua: {result.Skipped}; lỗi: {result.Errors}.";
-        MessageBox.Show(owner, summary, "Kết quả Xuất DXF", MessageBoxButtons.OK,
-            result.Errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+        if (settings.ShowDxfReport || result.Errors > 0)
+            MessageBox.Show(owner, summary, "Kết quả Xuất DXF", MessageBoxButtons.OK,
+                result.Errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
     }
 }

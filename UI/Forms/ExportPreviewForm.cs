@@ -44,7 +44,7 @@ public sealed class ExportPreviewForm : Form
             var rowIndex = _grid.Rows.Add(
                 index + 1,
                 true,
-                item.DetailName,
+                item.PartNumber ?? item.DetailName,
                 item.Material,
                 item.Quantity,
                 FormatThickness(item.Thickness),
@@ -141,7 +141,7 @@ public sealed class ExportPreviewForm : Form
         _grid.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Detail",
-            HeaderText = "Tên chi tiết",
+            HeaderText = "Part Number",
             FillWeight = 190,
             MinimumWidth = 150,
             ReadOnly = true

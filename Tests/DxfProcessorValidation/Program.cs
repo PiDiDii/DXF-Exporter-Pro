@@ -26,8 +26,8 @@ var emptyEntities = new[]
     "0", "SECTION", "2", "ENTITIES", "0", "ENDSEC", "0", "EOF"
 };
 Require(!DxfProcessor.ValidateDxfLines(emptyEntities), "An empty ENTITIES section was accepted.");
-Require(FileNameBuilder.BuildFileName("T2", 3, "SS400", "Bracket") == "T2_Q3_SS400_Bracket.dxf",
-    "The standard DXF filename format changed.");
+Require(FileNameBuilder.BuildFileName("T2", 3, "SS400", "PN-42") == "T2_Q3_SS400_PN-42.dxf",
+    "The standard DXF filename must use the Part Number.");
 
 var layerSettings = new ExportSettings();
 Require(!layerSettings.ExportBomAfterDxf,
@@ -159,12 +159,14 @@ try
 
     var textDxf = CreateDxfWithTables();
     DxfProcessor.AddInfoTextToDxf(textDxf,
-        new ExportItem("part.ipt", "Bracket", "SS400", "T2", 3),
+        new ExportItem("part.ipt", "Bracket", "SS400", "T2", 3, PartNumber: "PN-42"),
         "Căn giữa", 10, 15, -20);
     Require(DxfProcessor.ValidateDxfLines(textDxf), "TEXT insertion produced an invalid DXF.");
     Require(DxfProcessor.CountDxfEntities(textDxf) == 5, "TEXT insertion did not add exactly four entities.");
     Require(textDxf.Contains("DXF_INFO") && textDxf.Contains("DXF_INFO_STYLE"),
         "TEXT layer/style entries were not added to the DXF tables.");
+    Require(textDxf.Any(line => string.Equals(line, "PART NUMBER: PN-42", StringComparison.Ordinal)),
+        "DXF info text must use the Part Number instead of the detail name.");
 
     var retiredIniPath = Path.Combine(tempDirectory, "retired-settings.ini");
     File.WriteAllLines(retiredIniPath, ["OutputRoot=old-output"]);
@@ -177,28 +179,41 @@ try
     exportSettings.ConvFilter = "BRACKET";
     exportSettings.ConvMode = 1;
     exportSettings.ConvWriteLog = false;
+    exportSettings.ConvAssignInnerFaceAsASide = false;
+    exportSettings.ShowDxfReport = false;
     exportSettings.LayerSettings["IV_BEND_UP"] = "True";
     exportSettings.LayerSettings["IV_MARK_SURFACE"] = "True";
     exportSettingsStore.Save(exportSettings);
     var reloadedSettings = exportSettingsStore.Load();
     Require(!reloadedSettings.ExportBomAfterDxf
         && reloadedSettings.ConvFilter == "BRACKET" && reloadedSettings.ConvMode == 1
-        && !reloadedSettings.ConvWriteLog && reloadedSettings.LayerSettings["iv_bend_up"] == "True"
+        && !reloadedSettings.ConvWriteLog && !reloadedSettings.ConvAssignInnerFaceAsASide
+        && !reloadedSettings.ShowDxfReport && reloadedSettings.LayerSettings["iv_bend_up"] == "True"
         && reloadedSettings.LayerSettings["iv_mark_surface"] == "True",
         "Application settings were not persisted in the current JSON format.");
     var legacySettingsPath = Path.Combine(tempDirectory, "legacy-ExportSettings.json");
     File.WriteAllText(legacySettingsPath, "{\"ConvFilter\":\"LEGACY\"}");
-    Require(new ExportSettingsStore(legacySettingsPath).Load().ConvWriteLog,
-        "Existing settings without a log option must retain the previous log-enabled behavior.");
+    var legacySettings = new ExportSettingsStore(legacySettingsPath).Load();
+    Require(legacySettings.ConvWriteLog
+        && legacySettings.ConvAssignInnerFaceAsASide
+        && legacySettings.ShowDxfReport,
+        "Existing settings without new toggle options must retain their previous enabled behavior.");
 
     var profileDirectory = Path.Combine(tempDirectory, "profiles");
     Directory.CreateDirectory(profileDirectory);
     var profileStore = new SettingsProfileStore(profileDirectory);
-    var profileSettings = new ExportSettings { ExportBomAfterDxf = false };
+    var profileSettings = new ExportSettings
+    {
+        ExportBomAfterDxf = false,
+        ConvAssignInnerFaceAsASide = false,
+        ShowDxfReport = false
+    };
     profileStore.Save("separated", profileSettings);
     var reloadedProfile = new ExportSettings();
     Require(profileStore.TryLoad("separated", reloadedProfile)
-        && !reloadedProfile.ExportBomAfterDxf,
+        && !reloadedProfile.ExportBomAfterDxf
+        && !reloadedProfile.ConvAssignInnerFaceAsASide
+        && !reloadedProfile.ShowDxfReport,
         "A profile did not preserve the independent options.");
 
     var templatePath = Path.Combine(tempDirectory, "template.xlsx");
@@ -253,7 +268,7 @@ try
         bomSettings,
         [new BomTemplateRow(
             1,
-            "Bracket",
+            "PN-42",
             BomDimensionFormatter.Format(100, 50, "T2.5"),
             "SS400",
             3,
@@ -270,7 +285,7 @@ try
         Require(firstSheet.Cell("A7").GetString() == "LV2.0", "Project metadata was not written to its configured cell.");
         Require(firstSheet.Cell("M8").GetString() == "13/11/2026", "Date metadata was not formatted or written to its configured cell.");
         Require(firstSheet.Cell("A11").GetValue<int>() == 1, "Sequence number was not written.");
-        Require(firstSheet.Cell("C11").GetString() == "Bracket", "Detail name was not written.");
+        Require(firstSheet.Cell("C11").GetString() == "PN-42", "Part Number was not written to the BOM detail column.");
         Require(firstSheet.Cell("D11").GetString() == "image placeholder", "Image placeholder should remain untouched.");
         Require(firstSheet.Cell("E11").GetString() == "100 x 50 x 2,5",
             "The formatted dimensions were not written to the configured column.");

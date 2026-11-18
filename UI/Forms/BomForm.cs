@@ -62,15 +62,19 @@ public sealed class BomForm : Form
 
         var save = UiStyles.CreateButton("Lưu cài đặt");
         save.Click += (_, _) => SaveSettings();
+        var preview = UiStyles.CreateButton("Xem trước danh sách");
+        preview.Click += (_, _) => PreviewRequested?.Invoke(this, EventArgs.Empty);
         var export = UiStyles.CreateButton("Xuất BOM", primary: true);
         export.Click += (_, _) => Export();
         var close = UiStyles.CreateButton("Đóng");
         close.DialogResult = DialogResult.Cancel;
-        root.Controls.Add(UiStyles.CreateFooter(export, save, close), 0, 2);
+        root.Controls.Add(UiStyles.CreateFooter(export, preview, save, close), 0, 2);
         Controls.Add(root);
         AcceptButton = export;
         CancelButton = close;
     }
+
+    public event EventHandler? PreviewRequested;
 
     private Control BuildFileSection()
     {

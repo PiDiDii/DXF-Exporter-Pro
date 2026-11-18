@@ -14,12 +14,12 @@ public static class FileNameBuilder
         return result.Replace(" ", "_");
     }
 
-    public static string BuildFileName(string thickness, int quantity, string material, string detailName)
+    public static string BuildFileName(string thickness, int quantity, string material, string partNumber)
     {
         var result = ExportSettings.DefaultFilePattern.Replace("{DoDay}", CleanName(thickness), StringComparison.Ordinal)
             .Replace("{Qty}", "Q" + quantity.ToString(), StringComparison.Ordinal)
             .Replace("{VatLieu}", CleanName(material), StringComparison.Ordinal)
-            .Replace("{TenChiTiet}", CleanName(detailName), StringComparison.Ordinal);
+            .Replace("{PartNumber}", CleanName(partNumber), StringComparison.Ordinal);
         if (!result.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)) result += ".dxf";
         foreach (var invalid in Path.GetInvalidFileNameChars()) result = result.Replace(invalid, '_');
         return string.IsNullOrWhiteSpace(result) ? "FlatPattern.dxf" : result;

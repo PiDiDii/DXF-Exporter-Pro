@@ -2,7 +2,7 @@ namespace InventorDxfExporter.Core;
 
 public sealed class ExportSettings
 {
-    public const string DefaultFilePattern = "{DoDay}_{Qty}_{VatLieu}_{TenChiTiet}";
+    public const string DefaultFilePattern = "{DoDay}_{Qty}_{VatLieu}_{PartNumber}";
 
     public string OutputRoot { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
     public string OverwriteMode { get; set; } = "Hỏi từng file";
@@ -22,9 +22,11 @@ public sealed class ExportSettings
     public string ConvFilter { get; set; } = string.Empty;
     public int ConvMode { get; set; } = 2;
     public bool ConvSkipExisting { get; set; } = true;
+    public bool ConvAssignInnerFaceAsASide { get; set; } = true;
     public double ConvTolerance { get; set; } = 0.01;
     public string ConvLogFolder { get; set; } = string.Empty;
     public bool ConvWriteLog { get; set; } = true;
+    public bool ShowDxfReport { get; set; } = true;
     public Dictionary<string, string> LayerSettings { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
@@ -39,6 +41,7 @@ public sealed record ExportItem(
     int Quantity,
     double? FlatPatternXmm = null,
     double? FlatPatternYmm = null,
-    string? FlatPatternSizeIssue = null);
+    string? FlatPatternSizeIssue = null,
+    string? PartNumber = null);
 
 public sealed record OperationResult(int Success, int Skipped, int Errors, string LogFile, IReadOnlyList<string> Messages);

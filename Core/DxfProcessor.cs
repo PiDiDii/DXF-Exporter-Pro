@@ -371,7 +371,7 @@ public sealed class DxfProcessor
         int before=CountDxfEntities(lines);
         if(!EnsureInfoLayerAndStyle(lines))throw new InvalidDataException("TEXT - Không tìm thấy TABLES/LAYER/STYLE phù hợp để tạo layer/style thử nghiệm.");
         if(!RefreshMetrics(lines,out entityEnd,out minX,out maxX,out minY,out maxY))throw new InvalidDataException("TEXT - Không quét lại được ENTITIES sau khi cập nhật TABLES.");
-        string[] info={"DO DAY: "+item.Thickness.Replace("T",""),"SO LUONG: "+item.Quantity.ToString(),"VAT LIEU: "+CleanTextForDxf(item.Material),"TEN CHI TIET: "+CleanTextForDxf(item.DetailName)};
+        string[] info={"DO DAY: "+item.Thickness.Replace("T",""),"SO LUONG: "+item.Quantity.ToString(),"VAT LIEU: "+CleanTextForDxf(item.Material),"PART NUMBER: "+CleanTextForDxf(item.PartNumber ?? item.DetailName)};
         double startY=baseY+(info.Length-1)*gap;var insert=new List<string>();
         foreach(int n in Enumerable.Range(0,info.Length))
         {

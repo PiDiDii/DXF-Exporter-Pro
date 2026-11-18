@@ -32,8 +32,8 @@ public sealed class ExportSettingsForm : Form
         FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox = false;
         MaximizeBox = true;
-        MinimumSize = new System.Drawing.Size(900, 660);
-        ClientSize = new System.Drawing.Size(1000, 700);
+        MinimumSize = new System.Drawing.Size(800, 700);
+        ClientSize = new System.Drawing.Size(850, 780);
         _layers.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Enabled", HeaderText = "Xuất", FillWeight = 35 });
         _layers.Columns.Add("Name", "Tên layer");
         _layers.Columns.Add("Description", "Mô tả");
@@ -130,7 +130,7 @@ public sealed class ExportSettingsForm : Form
     private Control BuildProfiles(bool previewMode)
     {
         var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0, 4, 0, 0) };
-        bar.Controls.Add(new Label { Text = "Cấu hình dự án:", AutoSize = true, Margin = new Padding(0, 4, 8, 0) });
+        bar.Controls.Add(new Label { Text = "Cấu hình dự án:", AutoSize = true, Margin = new Padding(0, 0, 12, 0) });
         if (!previewMode) RefreshProfiles();
         _profileList.Margin = new Padding(0, 0, 8, 0);
         _profileList.DropDown += (_, _) => RefreshProfiles();

@@ -100,7 +100,7 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
                 {
                     string folder = IOPath.Combine(settings.OutputRoot, FileNameBuilder.CleanName(item.Material), FileNameBuilder.CleanName(item.Thickness));
                     Directory.CreateDirectory(folder);
-                    string path = IOPath.Combine(folder, FileNameBuilder.BuildFileName(item.Thickness, item.Quantity, item.Material, item.DetailName));
+                    string path = IOPath.Combine(folder, FileNameBuilder.BuildFileName(item.Thickness, item.Quantity, item.Material, item.PartNumber ?? item.DetailName));
                     if (IOFile.Exists(path))
                     {
                         if (settings.OverwriteMode == "Bỏ qua file đã có") { skippedExisting++; outputLines.AppendLine("BỎ QUA FILE ĐÃ CÓ: " + path); continue; }
@@ -175,7 +175,7 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
                 {
                     if (old.DocumentPath.Length > 0 && items.ContainsKey(old.DocumentPath)) continue;
                     string stalePath = IOPath.Combine(settings.OutputRoot, FileNameBuilder.CleanName(old.Material), FileNameBuilder.CleanName(old.Thickness),
-                        FileNameBuilder.BuildFileName(old.Thickness, old.Quantity, old.Material, old.DetailName));
+                        FileNameBuilder.BuildFileName(old.Thickness, old.Quantity, old.Material, old.PartNumber ?? old.DetailName));
                     if (!IOFile.Exists(stalePath)) continue;
                     if (settings.CleanupSuppressed) { IOFile.Delete(stalePath); deletedSuppressed++; }
                     else outputLines.AppendLine("CẢNH BÁO: File cũ của part Suppress vẫn còn: " + stalePath);
@@ -307,7 +307,8 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
             if (occurrence.DefinitionDocumentType != DocumentTypeEnum.kPartDocumentObject) return;
             var part = occurrence.Definition.Document as PartDocument;
             if (part?.ComponentDefinition is not SheetMetalComponentDefinition sm || string.IsNullOrEmpty(part.FullFileName)) return;
-            suppressed.Add(new ExportItem(part.FullFileName, IOPath.GetFileNameWithoutExtension(part.FullFileName), GetMaterial(part), GetThickness(sm), 1));
+            suppressed.Add(new ExportItem(part.FullFileName, IOPath.GetFileNameWithoutExtension(part.FullFileName),
+                GetMaterial(part), GetThickness(sm), 1, PartNumber: new PartInfoServiceImplementation().Read(part).PartNumber));
         }
         catch (Exception ex) { errors.Add(occurrence.Name + " (suppressed metadata): " + ex.Message); }
     }
@@ -326,7 +327,8 @@ public sealed class DxfExportServiceImplementation : IDxfExportService
                 var (xMm, yMm, sizeIssue) = GetFlatPatternSize(part, sm);
                 items.Add(part.FullFileName, new WorkItem(
                     new ExportItem(part.FullFileName, IOPath.GetFileNameWithoutExtension(part.FullFileName),
-                        GetMaterial(part), GetThickness(sm), quantity, xMm, yMm, sizeIssue),
+                        GetMaterial(part), GetThickness(sm), quantity, xMm, yMm, sizeIssue,
+                        new PartInfoServiceImplementation().Read(part).PartNumber),
                     part));
             }
         }

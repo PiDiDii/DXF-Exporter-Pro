@@ -10,6 +10,7 @@ public sealed class DxfExportForm : Form
     private readonly CheckBox _fast = new() { Text = "Tắt cập nhật giao diện khi xuất", AutoSize = true };
     private readonly CheckBox _cleanup = new() { Text = "Xóa DXF cũ của Part đang Suppress", AutoSize = true };
     private readonly CheckBox _exportBom = new() { Text = "Xuất thêm BOM sau khi xuất DXF", AutoSize = true };
+    private readonly CheckBox _showReport = new() { Text = "Hiện báo cáo sau khi xuất DXF", AutoSize = true };
     private readonly Button _settings = UiStyles.CreateButton("Cài đặt");
     private readonly ToolTip _toolTips = new();
 
@@ -29,9 +30,12 @@ public sealed class DxfExportForm : Form
         _fast.Checked = settings.FastMode;
         _cleanup.Checked = settings.CleanupSuppressed;
         _exportBom.Checked = settings.ExportBomAfterDxf;
+        _showReport.Checked = settings.ShowDxfReport;
         _toolTips.SetToolTip(_cleanup,
             "Xóa các file DXF cũ đã xuất cho các Part đang bị Suppress trong assembly khỏi thư mục xuất. " +
             "Không xóa Part hoặc Assembly trong Inventor. Khi tắt, các file DXF cũ được giữ lại và ghi cảnh báo trong báo cáo.");
+        _toolTips.SetToolTip(_showReport,
+            "Khi tắt, ẩn báo cáo tổng kết nếu không có lỗi. Các lỗi xuất vẫn luôn được thông báo.");
         _overwrite.Items.AddRange(new object[] { "Hỏi trước khi ghi đè", "Ghi đè tự động", "Bỏ qua file đã có" });
         _overwrite.SelectedIndex = settings.OverwriteMode switch
         {
@@ -80,13 +84,14 @@ public sealed class DxfExportForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(4, 6, 4, 2),
             ColumnCount = 1,
-            RowCount = 3
+            RowCount = 4
         };
-        for (var index = 0; index < 3; index++)
-            options.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 3));
+        for (var index = 0; index < 4; index++)
+            options.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
         options.Controls.Add(_exportBom, 0, 0);
-        options.Controls.Add(_fast, 0, 1);
-        options.Controls.Add(_cleanup, 0, 2);
+        options.Controls.Add(_showReport, 0, 1);
+        options.Controls.Add(_fast, 0, 2);
+        options.Controls.Add(_cleanup, 0, 3);
         optionsSection.Controls.Add(options);
 
         content.Controls.Add(outputSection, 0, 0);
@@ -129,6 +134,7 @@ public sealed class DxfExportForm : Form
         settings.FastMode = _fast.Checked;
         settings.CleanupSuppressed = _cleanup.Checked;
         settings.ExportBomAfterDxf = _exportBom.Checked;
+        settings.ShowDxfReport = _showReport.Checked;
     }
 
     protected override void Dispose(bool disposing)

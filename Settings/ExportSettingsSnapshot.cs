@@ -22,9 +22,11 @@ internal sealed class ExportSettingsSnapshot
     public string ConvFilter { get; set; } = string.Empty;
     public int ConvMode { get; set; } = 2;
     public bool ConvSkipExisting { get; set; } = true;
+    public bool ConvAssignInnerFaceAsASide { get; set; } = true;
     public double ConvTolerance { get; set; } = 0.01;
     public string ConvLogFolder { get; set; } = string.Empty;
     public bool ConvWriteLog { get; set; } = true;
+    public bool ShowDxfReport { get; set; } = true;
     public Dictionary<string, string> LayerSettings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public static ExportSettingsSnapshot From(ExportSettings settings) => new()
@@ -47,9 +49,11 @@ internal sealed class ExportSettingsSnapshot
         ConvFilter = settings.ConvFilter,
         ConvMode = settings.ConvMode,
         ConvSkipExisting = settings.ConvSkipExisting,
+        ConvAssignInnerFaceAsASide = settings.ConvAssignInnerFaceAsASide,
         ConvTolerance = settings.ConvTolerance,
         ConvLogFolder = settings.ConvLogFolder,
         ConvWriteLog = settings.ConvWriteLog,
+        ShowDxfReport = settings.ShowDxfReport,
         LayerSettings = new Dictionary<string, string>(settings.LayerSettings, StringComparer.OrdinalIgnoreCase)
     };
 
@@ -73,9 +77,11 @@ internal sealed class ExportSettingsSnapshot
         settings.ConvFilter = ConvFilter;
         settings.ConvMode = ConvMode;
         settings.ConvSkipExisting = ConvSkipExisting;
+        settings.ConvAssignInnerFaceAsASide = ConvAssignInnerFaceAsASide;
         settings.ConvTolerance = ConvTolerance;
         settings.ConvLogFolder = ConvLogFolder;
         settings.ConvWriteLog = ConvWriteLog;
+        settings.ShowDxfReport = ShowDxfReport;
         settings.LayerSettings.Clear();
         foreach (var pair in LayerSettings)
             settings.LayerSettings[pair.Key] = pair.Value;
