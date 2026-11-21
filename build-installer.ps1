@@ -3,7 +3,7 @@ param(
     [string]$Configuration = 'Release',
     [string]$InventorBinPath = 'C:\Program Files\Autodesk\Inventor 2027\Bin',
     [string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist'),
-    [string]$ProductVersion = '1.0.2'
+    [string]$ProductVersion = '1.0.4'
 )
 
 $ErrorActionPreference = 'Stop'

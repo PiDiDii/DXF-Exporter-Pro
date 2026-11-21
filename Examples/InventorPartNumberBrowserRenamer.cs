@@ -78,6 +78,7 @@ namespace InventorDxfExporter.Commands
         private readonly Label _structureBody = new Label();
         private readonly WinFormsTextBox _log = new WinFormsTextBox();
         private readonly HashSet<string> _skipKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _manualNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private bool _hasPreview;
         private bool _busy;
         private bool _applied;
@@ -142,49 +143,93 @@ namespace InventorDxfExporter.Commands
 
         private void BuildUi()
         {
-            var top = new Panel { Dock = DockStyle.Top, Height = 122, Padding = new Padding(12) };
-            var lblPrefix = new Label { Text = "Prefix:", AutoSize = true, Location = new Point(12, 17) };
-            _prefix.Text = "";
-            _prefix.Location = new Point(70, 12);
-            _prefix.Width = 190;
+            var top = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 8, 12, 4) };
+            var settings = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 7,
+                RowCount = 3,
+                Margin = Padding.Empty
+            };
+            settings.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 55));
+            settings.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+            settings.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+            settings.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58));
+            settings.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 105));
+            settings.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));
+            settings.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            settings.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            settings.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+            settings.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-            var lblTotal = new Label { Text = "Tổng SL chi tiết/cụm lắp:", AutoSize = true, Location = new Point(278, 17) };
-            _total.Location = new Point(442, 12);
-            _total.Size = new Size(58, 24);
+            var lblPrefix = new Label { Text = "Prefix:", AutoSize = true, Anchor = AnchorStyles.Left };
+            _prefix.Dock = DockStyle.Fill;
+            _prefix.Margin = new Padding(0, 3, 10, 3);
+            var lblTotal = new Label
+            {
+                Text = "Tổng SL chi tiết/cụm lắp:",
+                AutoSize = true,
+                Anchor = AnchorStyles.Left
+            };
+            _total.Dock = DockStyle.Fill;
+            _total.Margin = new Padding(0, 3, 10, 3);
             _total.ReadOnly = true;
             _total.TextAlign = HorizontalAlignment.Center;
-            var lblDigits = new Label { Text = "Số ký tự hậu tố:", AutoSize = true, Location = new Point(520, 17) };
-            _digits.Location = new Point(625, 12);
+            var lblDigits = new Label { Text = "Số ký tự hậu tố:", AutoSize = true, Anchor = AnchorStyles.Left };
+            _digits.Dock = DockStyle.Fill;
+            _digits.Margin = new Padding(0, 3, 10, 3);
             _digits.Minimum = 1;
             _digits.Maximum = 6;
             _digits.Value = 2;
 
-            var lblMode = new Label { Text = "Chế độ:", AutoSize = true, Location = new Point(12, 53) };
+            var lblMode = new Label { Text = "Chế độ:", AutoSize = true, Anchor = AnchorStyles.Left };
             _mode.DropDownStyle = ComboBoxStyle.DropDownList;
             _mode.Items.Add("Browser Name (chỉ đổi tên hiển thị)");
             _mode.Items.Add("Part Number (chỉ đổi iProperty)");
             _mode.SelectedIndex = 0;
-            _mode.Location = new Point(70, 48);
-            _mode.Width = 300;
+            _mode.Dock = DockStyle.Fill;
+            _mode.Margin = new Padding(0, 3, 10, 3);
 
             _overwrite.Text = "Ghi mới hoàn toàn (bỏ qua mã hiện có)";
-            _overwrite.AutoSize = true;
-            _overwrite.Location = new Point(390, 52);
+            _overwrite.Dock = DockStyle.Fill;
+            _overwrite.AutoSize = false;
+            _overwrite.Margin = new Padding(0, 3, 0, 3);
             _includeLibrary.Text = "Đổi cả chi tiết thư viện";
-            _includeLibrary.AutoSize = true;
-            _includeLibrary.Location = new Point(390, 78);
+            _includeLibrary.Dock = DockStyle.Fill;
+            _includeLibrary.AutoSize = false;
+            _includeLibrary.Margin = new Padding(0, 3, 0, 3);
 
             _previewButton.Text = "Xem trước";
-            _previewButton.Location = new Point(760, 10);
             _previewButton.Size = new Size(105, 32);
-            _previewButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _applyButton.Text = "Thực hiện";
-            _applyButton.Location = new Point(875, 10);
             _applyButton.Size = new Size(120, 32);
-            _applyButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            var actions = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                Margin = Padding.Empty,
+                Padding = new Padding(0, 1, 0, 0)
+            };
+            actions.Controls.Add(_applyButton);
+            actions.Controls.Add(_previewButton);
 
-            top.Controls.AddRange(new Control[] { lblPrefix, _prefix, lblTotal, _total, lblDigits, _digits,
-                lblMode, _mode, _overwrite, _includeLibrary, _previewButton, _applyButton });
+            settings.Controls.Add(lblPrefix, 0, 0);
+            settings.Controls.Add(_prefix, 1, 0);
+            settings.Controls.Add(lblTotal, 2, 0);
+            settings.Controls.Add(_total, 3, 0);
+            settings.Controls.Add(lblDigits, 4, 0);
+            settings.Controls.Add(_digits, 5, 0);
+            settings.Controls.Add(lblMode, 0, 1);
+            settings.Controls.Add(_mode, 1, 1);
+            settings.SetColumnSpan(_mode, 2);
+            settings.Controls.Add(_overwrite, 3, 1);
+            settings.SetColumnSpan(_overwrite, 4);
+            settings.Controls.Add(_includeLibrary, 0, 2);
+            settings.SetColumnSpan(_includeLibrary, 4);
+            settings.Controls.Add(actions, 4, 2);
+            settings.SetColumnSpan(actions, 3);
+            top.Controls.Add(settings);
 
             var structure = new Panel
             {
@@ -238,11 +283,26 @@ namespace InventorDxfExporter.Commands
             _status.Padding = new Padding(10, 5, 0, 0);
             _status.Text = "Chưa lưu tự động. Kiểm tra kết quả rồi Save các tài liệu trong Inventor.";
 
-            Controls.Add(_grid);
-            Controls.Add(_log);
-            Controls.Add(_status);
-            Controls.Add(structure);
-            Controls.Add(top);
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 5,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
+            };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 132));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 142));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+            layout.Controls.Add(top, 0, 0);
+            layout.Controls.Add(structure, 0, 1);
+            layout.Controls.Add(_grid, 0, 2);
+            layout.Controls.Add(_log, 0, 3);
+            layout.Controls.Add(_status, 0, 4);
+            Controls.Add(layout);
 
             _mode.SelectedIndexChanged += (s, e) => UpdatePreview();
             _prefix.TextChanged += (s, e) => { if (_hasPreview) UpdatePreview(); };
@@ -262,15 +322,12 @@ namespace InventorDxfExporter.Commands
                     _grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
             };
             _grid.CellValueChanged += OnSkipChanged;
+            _grid.CellValueChanged += OnManualNameChanged;
             _prefix.Text = _previewOnly ? "ZC-ATS-" : "";
-            _applyButton.Enabled = !_previewOnly;
-            _previewButton.Enabled = !_previewOnly;
+            _applyButton.Enabled = true;
+            _previewButton.Enabled = true;
             if (_previewOnly)
             {
-                _overwrite.Enabled = false;
-                _includeLibrary.Enabled = false;
-                _digits.Enabled = false;
-                _prefix.ReadOnly = true;
                 AppendLog("Chế độ xem trước: dữ liệu mẫu, không kết nối Inventor và không thực hiện thay đổi.");
             }
         }
@@ -651,7 +708,7 @@ namespace InventorDxfExporter.Commands
                     AddColumn("Cấp", 12);
                     AddColumn("Loại", 16);
                     AddColumn("Browser Name hiện tại", 30);
-                    AddColumn("Browser Name sau khi áp dụng", 32);
+                    AddColumn("Browser Name sau khi áp dụng", 32, false);
                     AddColumn("Part Number nguồn", 20);
                     AddColumn("Trạng thái", 22);
                     AddSkipColumn();
@@ -660,7 +717,13 @@ namespace InventorDxfExporter.Commands
                         var docRow = FindDocument(occurrence.DocumentKey);
                         if (docRow == null) continue;
                         string next = occurrence.OldName;
-                        if (_newPartNumbers.TryGetValue(occurrence.DocumentKey, out var pn)
+                        var manualKey = GetOccurrenceManualKey(occurrence);
+                        if (_manualNames.TryGetValue(manualKey, out var manualName)
+                            && !string.IsNullOrWhiteSpace(manualName))
+                        {
+                            next = manualName;
+                        }
+                        else if (_newPartNumbers.TryGetValue(occurrence.DocumentKey, out var pn)
                             && !string.IsNullOrWhiteSpace(pn))
                         {
                             string suffix = GetOccurrenceSuffix(occurrence.OldName);
@@ -680,14 +743,18 @@ namespace InventorDxfExporter.Commands
                     AddColumn("Cấp lắp ráp", 14);
                     AddColumn("Loại", 18);
                     AddColumn("Part Number hiện tại", 28);
-                    AddColumn("Part Number sau khi áp dụng", 30);
+                    AddColumn("Part Number sau khi áp dụng", 30, false);
                     AddColumn("Trạng thái", 22);
                     AddSkipColumn();
                     foreach (var row in _documents)
                     {
                         string state = row.IsTop ? "Gốc (cụm lắp tổng)" : GetStatus(row);
+                        var target = _manualNames.TryGetValue(row.Key, out var manualName)
+                            && !string.IsNullOrWhiteSpace(manualName)
+                                ? manualName
+                                : row.NewPartNumber;
                         int i = _grid.Rows.Add(row.IsTop ? "Gốc" : "Cấp " + row.Depth,
-                            row.KindText, row.OldPartNumber, row.NewPartNumber, state, row.Skip);
+                            row.KindText, row.OldPartNumber, target, state, row.Skip);
                         _grid.Rows[i].Tag = row;
                         ColorRow(_grid.Rows[i], state);
                         _grid.Rows[i].Cells[5].ReadOnly = IsSkipReadOnly(row);
@@ -702,7 +769,7 @@ namespace InventorDxfExporter.Commands
             _total.Text = _documents.Count(row => !row.IsTop
                 && string.IsNullOrEmpty(row.IgnoreReason)
                 && (!row.IsLibrary || _includeLibrary.Checked)).ToString();
-            _applyButton.Enabled = !_previewOnly && !_applied
+            _applyButton.Enabled = !_applied
                 && !string.IsNullOrWhiteSpace(_prefix.Text)
                 && HasChanges()
                 && !_documents.Any(row => GetStatus(row) == "Vượt giới hạn hậu tố");
@@ -712,7 +779,7 @@ namespace InventorDxfExporter.Commands
             _documents.FirstOrDefault(row => string.Equals(row.Key, key, StringComparison.OrdinalIgnoreCase));
 
         private bool IsSkipReadOnly(DocumentRow row) =>
-            _previewOnly || _applied || row.IsTop || !string.IsNullOrEmpty(row.IgnoreReason)
+            _applied || row.IsTop || !string.IsNullOrEmpty(row.IgnoreReason)
             || row.IsLibrary && !_includeLibrary.Checked;
 
         private static string GetStatus(DocumentRow row) =>
@@ -727,6 +794,14 @@ namespace InventorDxfExporter.Commands
             if (row.Status is "Thư viện (bỏ qua)" or "Bỏ qua (người dùng)" or "iPart/iAssembly (bỏ qua)"
                 or "Không hỗ trợ (bỏ qua)" or "Không kiểm tra được loại")
                 return row.Status;
+            var manualKey = GetOccurrenceManualKey(occurrence);
+            if (_manualNames.TryGetValue(manualKey, out var manualName)
+                && !string.IsNullOrWhiteSpace(manualName))
+            {
+                return string.Equals(occurrence.OldName, manualName, StringComparison.Ordinal)
+                    ? "Giữ nguyên (đã đúng)"
+                    : "Sẽ đổi tên";
+            }
             if (string.IsNullOrWhiteSpace(row.NewPartNumber))
                 return GetStatus(row);
             var suffix = GetOccurrenceSuffix(occurrence.OldName);
@@ -745,9 +820,13 @@ namespace InventorDxfExporter.Commands
                     return row != null && !row.IsTop && !row.Skip
                         && string.IsNullOrEmpty(row.IgnoreReason)
                         && (!row.IsLibrary || _includeLibrary.Checked)
-                        && GetOccurrenceStatus(occurrence, row) == "Sẽ đổi tên";
+                        && (_manualNames.ContainsKey(GetOccurrenceManualKey(occurrence))
+                            || GetOccurrenceStatus(occurrence, row) == "Sẽ đổi tên");
                 });
-            return _documents.Any(row => !row.IsTop && GetStatus(row) == "Sẽ đổi tên");
+            return _documents.Any(row => !row.IsTop
+                && (_manualNames.TryGetValue(row.Key, out var manualName)
+                    ? !string.Equals(row.OldPartNumber, manualName, StringComparison.Ordinal)
+                    : GetStatus(row) == "Sẽ đổi tên"));
         }
 
         private static void ColorRow(DataGridViewRow row, string status)
@@ -771,6 +850,17 @@ namespace InventorDxfExporter.Commands
                 HeaderText = title,
                 FillWeight = weight,
                 SortMode = DataGridViewColumnSortMode.NotSortable
+            });
+        }
+
+        private void AddColumn(string title, float weight, bool readOnly)
+        {
+            _grid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = title,
+                FillWeight = weight,
+                SortMode = DataGridViewColumnSortMode.NotSortable,
+                ReadOnly = readOnly
             });
         }
 
@@ -800,6 +890,24 @@ namespace InventorDxfExporter.Commands
                 _skipKeys.Remove(documentRow.Key);
             UpdatePreview();
         }
+
+        private void OnManualNameChanged(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (_busy || e.RowIndex < 0 || e.ColumnIndex != 3) return;
+            var gridRow = _grid.Rows[e.RowIndex];
+            var value = Convert.ToString(gridRow.Cells[e.ColumnIndex].Value)?.Trim() ?? string.Empty;
+            if (gridRow.Tag is OccurrenceRow occurrence)
+                _manualNames[GetOccurrenceManualKey(occurrence)] = value;
+            else if (gridRow.Tag is DocumentRow documentRow)
+            {
+                _manualNames[documentRow.Key] = value;
+                documentRow.NewPartNumber = value;
+            }
+            UpdatePreview();
+        }
+
+        private static string GetOccurrenceManualKey(OccurrenceRow occurrence) =>
+            occurrence.DocumentKey + "|" + occurrence.Depth + "|" + occurrence.OldName;
 
         private void UpdateStructure()
         {
@@ -858,7 +966,7 @@ namespace InventorDxfExporter.Commands
 
         private void ApplySelectedMode(object? sender, EventArgs e)
         {
-            if (_previewOnly || !_hasPreview || string.IsNullOrWhiteSpace(_prefix.Text))
+            if (!_hasPreview || string.IsNullOrWhiteSpace(_prefix.Text))
             {
                 MessageBox.Show("Nhập Prefix và bấm Xem trước trước khi thực hiện.", Text,
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -866,6 +974,25 @@ namespace InventorDxfExporter.Commands
             }
 
             bool browserMode = _mode.SelectedIndex == (int)NamingMode.BrowserName;
+            if (_previewOnly)
+            {
+                if (MessageBox.Show("Chế độ xem trước: thực hiện mô phỏng, không thay đổi Inventor hay file.\r\n\r\nTiếp tục?",
+                        Text, MessageBoxButtons.YesNo, MessageBoxIcon.Information,
+                        MessageBoxDefaultButton.Button1) != DialogResult.Yes)
+                    return;
+                _applied = true;
+                UpdatePreview();
+                _prefix.Enabled = false;
+                _digits.Enabled = false;
+                _mode.Enabled = false;
+                _overwrite.Enabled = false;
+                _includeLibrary.Enabled = false;
+                _previewButton.Enabled = false;
+                _applyButton.Enabled = false;
+                AppendLog("Đã mô phỏng thực hiện trong dữ liệu xem trước. Không có tài liệu hoặc file nào bị thay đổi.");
+                _status.Text = "Đã mô phỏng thực hiện. Không thay đổi Inventor hoặc file.";
+                return;
+            }
             string action = browserMode
                 ? "Đổi Browser Name của các occurrence không bị bỏ qua theo Part Number xem trước?\r\nPart Number iProperty và tên file sẽ không đổi."
                 : "Ghi Part Number iProperty theo bảng xem trước?\r\nBrowser Name và tên file sẽ không đổi.";
@@ -905,11 +1032,21 @@ namespace InventorDxfExporter.Commands
                     {
                         if (occurrence.Occurrence == null)
                             throw new InvalidOperationException("Occurrence mẫu không thể được sửa.");
-                        if (!_newPartNumbers.TryGetValue(occurrence.DocumentKey, out var pn)
-                            || string.IsNullOrWhiteSpace(pn))
-                            continue;
-                        string suffix = GetOccurrenceSuffix(occurrence.OldName);
-                        string target = suffix.Length == 0 ? pn : pn + ":" + suffix;
+                        var manualKey = GetOccurrenceManualKey(occurrence);
+                        string target;
+                        if (_manualNames.TryGetValue(manualKey, out var manualName)
+                            && !string.IsNullOrWhiteSpace(manualName))
+                        {
+                            target = manualName;
+                        }
+                        else
+                        {
+                            if (!_newPartNumbers.TryGetValue(occurrence.DocumentKey, out var pn)
+                                || string.IsNullOrWhiteSpace(pn))
+                                continue;
+                            string suffix = GetOccurrenceSuffix(occurrence.OldName);
+                            target = suffix.Length == 0 ? pn : pn + ":" + suffix;
+                        }
                         if (!string.Equals(occurrence.Occurrence.Name, target, StringComparison.Ordinal))
                         {
                             occurrence.Occurrence.Name = target;
@@ -929,21 +1066,25 @@ namespace InventorDxfExporter.Commands
             {
                 foreach (var row in _documents)
                 {
+                    var target = _manualNames.TryGetValue(row.Key, out var manualName)
+                        && !string.IsNullOrWhiteSpace(manualName)
+                            ? manualName
+                            : row.NewPartNumber;
                     if (row.IsTop || row.Skip || row.IgnoreReason.Length != 0
                         || row.IsLibrary && !_includeLibrary.Checked
-                        || string.IsNullOrEmpty(row.NewPartNumber)
-                        || row.OldPartNumber == row.NewPartNumber)
+                        || string.IsNullOrEmpty(target)
+                        || row.OldPartNumber == target)
                         continue;
                     try
                     {
                         if (row.Document == null)
                             throw new InvalidOperationException("Tài liệu mẫu không thể được sửa.");
-                        SetPartNumber(row.Document, row.NewPartNumber);
-                        if (!string.Equals(GetPartNumber(row.Document), row.NewPartNumber, StringComparison.Ordinal))
+                        SetPartNumber(row.Document, target);
+                        if (!string.Equals(GetPartNumber(row.Document), target, StringComparison.Ordinal))
                             throw new InvalidOperationException("Kiểm tra lại iProperty không khớp sau khi ghi.");
                         changed++;
                         row.Status = "Đã đổi";
-                        AppendLog($"{row.Document.DisplayName}: {row.OldPartNumber} -> {row.NewPartNumber}");
+                        AppendLog($"{row.Document.DisplayName}: {row.OldPartNumber} -> {target}");
                     }
                     catch (Exception ex)
                     {

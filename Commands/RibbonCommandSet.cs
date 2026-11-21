@@ -30,6 +30,7 @@ public sealed class RibbonCommandSet
         var convert = new ConvertStepCommand(_application);
         var export = new ExportDxfCommand(_application);
         var bom = new ExportBomCommand(_application);
+        var exportStep = new ExportStepCommand(_application);
         var changeKFactor = new RunILogicRuleCommand(_application, "Doi_K_Factor_Assembly.vb");
 
         var convertButton = Define("Convert STEP", "ConvertStep",
@@ -43,6 +44,8 @@ public sealed class RibbonCommandSet
             "Kiểm tra, xem trước và xuất DXF cho part Sheet Metal trong tài liệu hiện hành.", "Xuất DXF", IconKind.Dxf, export.Execute);
         var bomButton = Define("Xuất BOM", "ExportBom",
             "Tạo bảng BOM Excel (.xlsx) bằng ClosedXML; không yêu cầu cài Microsoft Excel.", "Xuất BOM", IconKind.Bom, bom.Execute);
+        var stepButton = Define("Xuất STEP", "ExportStep",
+            "Chọn và xuất từng chi tiết Assembly hoặc Part sang STEP AP214.", "Xuất STEP", IconKind.Step, exportStep.Execute);
         var kFactorButton = Define("Đổi hệ số K", "ChangeKFactor",
             "Đổi hệ số K cho các chi tiết Sheet Metal được chọn trong Assembly.", "Đổi hệ số K", IconKind.KFactor, changeKFactor.Execute);
         var partNumberButton = Define("Đổi Part Number", "ChangePartNumber",
@@ -56,13 +59,13 @@ public sealed class RibbonCommandSet
         if (firstTime || !HasCurrentRibbonTabs())
         {
             Trace.TraceInformation("Khởi tạo các Ribbon tab DXF Exporter còn thiếu.");
-            EnsureRibbonTabs(convertButton, exportButton, bomButton, kFactorButton, partNumberButton);
+            EnsureRibbonTabs(convertButton, exportButton, bomButton, stepButton, kFactorButton, partNumberButton);
         }
     }
 
     private bool HasCurrentRibbonTabs() =>
-        HasRibbonTab("Assembly", "InventorDxfExporter.Assembly.V5.Tab")
-        && HasRibbonTab("Part", "InventorDxfExporter.Part.V5.Tab");
+        HasRibbonTab("Assembly", "InventorDxfExporter.Assembly.V6.Tab")
+        && HasRibbonTab("Part", "InventorDxfExporter.Part.V6.Tab");
 
     private bool HasRibbonTab(string ribbonName, string tabInternalName)
     {
@@ -83,19 +86,20 @@ public sealed class RibbonCommandSet
     }
 
     private void EnsureRibbonTabs(ButtonDefinition convertButton, ButtonDefinition exportButton,
-        ButtonDefinition bomButton, ButtonDefinition kFactorButton, ButtonDefinition partNumberButton)
+        ButtonDefinition bomButton, ButtonDefinition stepButton,
+        ButtonDefinition kFactorButton, ButtonDefinition partNumberButton)
     {
-        AddTab("Assembly", "DXF Exporter", "InventorDxfExporter.Assembly.V5.Tab",
-            new PanelLayout("Thao tác", "InventorDxfExporter.Assembly.V5.CommandsPanel", new[]
+        AddTab("Assembly", "DXF Exporter", "InventorDxfExporter.Assembly.V6.Tab",
+            new PanelLayout("Thao tác", "InventorDxfExporter.Assembly.V6.CommandsPanel", new[]
             {
                 new ButtonLayout(convertButton), new ButtonLayout(exportButton), new ButtonLayout(bomButton),
-                new ButtonLayout(kFactorButton), new ButtonLayout(partNumberButton)
+                new ButtonLayout(stepButton), new ButtonLayout(kFactorButton), new ButtonLayout(partNumberButton)
             }));
 
-        AddTab("Part", "DXF Exporter", "InventorDxfExporter.Part.V5.Tab",
-            new PanelLayout("Xuất", "InventorDxfExporter.Part.V5.ExportPanel", new[]
+        AddTab("Part", "DXF Exporter", "InventorDxfExporter.Part.V6.Tab",
+            new PanelLayout("Xuất", "InventorDxfExporter.Part.V6.ExportPanel", new[]
             {
-                new ButtonLayout(exportButton), new ButtonLayout(bomButton)
+                new ButtonLayout(exportButton), new ButtonLayout(bomButton), new ButtonLayout(stepButton)
             }));
     }
 
@@ -106,9 +110,10 @@ public sealed class RibbonCommandSet
     {
         try
         {
-            if (_definitions.Count < 5)
+            if (_definitions.Count < 6)
                 return;
-            EnsureRibbonTabs(_definitions[0], _definitions[1], _definitions[2], _definitions[3], _definitions[4]);
+            EnsureRibbonTabs(_definitions[0], _definitions[1], _definitions[2],
+                _definitions[3], _definitions[4], _definitions[5]);
         }
         catch (Exception ex)
         {
@@ -125,7 +130,9 @@ public sealed class RibbonCommandSet
             "InventorDxfExporter.Assembly.V3.Tab",
             "InventorDxfExporter.Part.V3.Tab",
             "InventorDxfExporter.Assembly.V4.Tab",
-            "InventorDxfExporter.Part.V4.Tab"
+            "InventorDxfExporter.Part.V4.Tab",
+            "InventorDxfExporter.Assembly.V5.Tab",
+            "InventorDxfExporter.Part.V5.Tab"
         };
         foreach (var ribbonName in new[] { "Assembly", "Part" })
         {
@@ -268,6 +275,18 @@ public sealed class RibbonCommandSet
                     graphics.DrawLine(grid, 40, 11, 40, 53);
                 }
                 break;
+            case IconKind.Step:
+                DrawDocumentFrame(graphics, blue, paleFill, 10, 8, 44, 48);
+                graphics.DrawPolygon(accent, new[]
+                {
+                    new System.Drawing.PointF(22, 22),
+                    new System.Drawing.PointF(40, 16),
+                    new System.Drawing.PointF(50, 28),
+                    new System.Drawing.PointF(34, 35),
+                    new System.Drawing.PointF(22, 22)
+                });
+                graphics.DrawLine(accent, 34, 35, 34, 50);
+                break;
             case IconKind.KFactor:
                 graphics.DrawEllipse(accent, 13, 9, 38, 38);
                 using (var font = new System.Drawing.Font("Segoe UI", 25, System.Drawing.FontStyle.Bold))
@@ -321,7 +340,7 @@ public sealed class RibbonCommandSet
         _definitions.Clear();
     }
 
-    private enum IconKind { Convert, Dxf, Bom, KFactor, PartNumber }
+    private enum IconKind { Convert, Dxf, Bom, Step, KFactor, PartNumber }
     private sealed record PanelLayout(string Caption, string InternalName, ButtonLayout[] Buttons);
     private sealed record ButtonLayout(ButtonDefinition Definition);
     private sealed record IconPair(System.Drawing.Bitmap StandardBitmap, System.Drawing.Bitmap LargeBitmap, object StandardPicture, object LargePicture);

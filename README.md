@@ -16,7 +16,7 @@ Examples/   Công cụ C# đổi Part Number/Browser Name và rule iLogic K-Fact
 
 ## Chức năng
 
-- Ribbon cho Convert STEP (Assembly), Xuất DXF và Xuất BOM (Part/Assembly); thêm Đổi hệ số K bằng iLogic và công cụ C# Đổi Part Number/Browser Name (Assembly).
+- Ribbon cho Convert STEP (Assembly), Xuất DXF và Xuất BOM (Part/Assembly); thêm Đổi hệ số K bằng iLogic, Đổi Part Number/Browser Name (Assembly) và Xuất STEP cho Assembly/Part.
 - Công cụ C# cho xem trước, đánh số theo phân cấp và chọn đổi Browser Name occurrence hoặc iProperty Part Number; không đổi tên file và không tự lưu tài liệu. Lệnh Đổi hệ số K vẫn chạy rule iLogic được đóng gói cạnh DLL và mặc định tự lưu từng part theo tùy chọn trong form.
 - Dashboard Preview có màn hình Part Number/Browser Name với dữ liệu mẫu, không kết nối Inventor và không thực hiện thay đổi; form khôi phục số lượng, sơ đồ mã, tùy chọn thư viện, trạng thái/bỏ qua và log/sao lưu CSV. Không có phần xem 3D.
 - Convert STEP sang Sheet Metal, xác định độ dày, tùy chọn gán A-Side vào mặt trong, tạo Flat Pattern; có lọc tên, hai chế độ Thickness, bỏ qua Flat Pattern sẵn có, tolerance, log và hủy tiến trình.
